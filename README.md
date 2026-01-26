@@ -1,2 +1,2 @@
 # trackpadDS
-TrackPadDS is an Android overlay tool for AYN Thor that turns the secondary screen into trackpads and floating controls, with cursor, scroll, and global actions via accessibility, plus optional mirror mode and quick UI tuning.
+AYN Thor Bottom Screen Power Tool (TrackPadDS) is an Android overlay app that turns the secondary display into configurable trackpads and floating navigation controls. It uses an accessibility service and overlay permissions to drive a cursor, clicks, scrolling, and global actions, with optional screen‑mirror mode for touch passthrough. The app includes granular UI controls (visibility, opacity, size, haptics, sensitivity) plus backup/restore of settings and positions.
