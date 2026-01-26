@@ -59,6 +59,9 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(0xFF000000.toInt())
         }
 
+        root.addView(buildKofiBanner())
+        root.addView(space(12))
+
         buildPermissionNotice()?.let { notice ->
             root.addView(notice)
             root.addView(space(12))
@@ -370,6 +373,44 @@ class MainActivity : ComponentActivity() {
         container.addView(space(16))
         container.addView(buildBackupImportMenu())
         return container
+    }
+
+    private fun buildKofiBanner(): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(16, 16, 16, 16)
+            setBackgroundColor(0xFF141414.toInt())
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setOnClickListener {
+                val uri = Uri.parse("https://ko-fi.com/minxf1")
+                startActivity(Intent(Intent.ACTION_VIEW, uri))
+            }
+
+            val textView = TextView(context).apply {
+                text = "Buy me coffee if you love the app"
+                textSize = 14f
+                setTextColor(0xFFE0E0E0.toInt())
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+            }
+
+            addView(textView)
+
+            val iconView = ImageView(context).apply {
+                setImageResource(R.drawable.support_me_on_kofi_dark)
+                adjustViewBounds = true
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                layoutParams = LinearLayout.LayoutParams(dp(120), dp(28)).apply {
+                    marginStart = dp(12)
+                }
+            }
+            addView(iconView)
+        }
     }
 
     private fun buildSectionHeader(title: String, subtitle: String): LinearLayout {
