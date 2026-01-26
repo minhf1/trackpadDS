@@ -59,6 +59,11 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(0xFF000000.toInt())
         }
 
+        buildPermissionNotice()?.let { notice ->
+            root.addView(notice)
+            root.addView(space(12))
+        }
+
         startBtn = Button(this)
         updateOverlayButtonState()
 
@@ -132,6 +137,50 @@ class MainActivity : ComponentActivity() {
         val enabled = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
         return enabled.any { it.resolveInfo.serviceInfo.packageName == packageName &&
                 it.resolveInfo.serviceInfo.name.contains("PointerAccessibilityService") }
+    }
+
+    private fun buildPermissionNotice(): LinearLayout? {
+        val overlayMissing = !Settings.canDrawOverlays(this)
+        val a11yMissing = !isPointerA11yEnabled()
+        val notifMissing = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        if (!overlayMissing && !a11yMissing && !notifMissing) return null
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(16, 16, 16, 16)
+            setBackgroundColor(0xFF1A1A1A.toInt())
+        }
+
+        val title = TextView(this).apply {
+            text = "Read before using the app, there are a few permissions needed and here is how the app use them"
+            textSize = 16f
+            setTextColor(0xFFFFFFFF.toInt())
+        }
+
+        val bullets = mutableListOf<String>().apply {
+            if (overlayMissing) {
+                add("Overlay permission to draw the floating controls.")
+            }
+            if (a11yMissing) {
+                add("Accessibility service to send back/home/recents actions for the cursor.")
+            }
+            if (notifMissing) {
+                add("Notification permission to show the foreground service status and also keep the app service stable.")
+            }
+        }
+
+        container.addView(title)
+        container.addView(space(6))
+        for (item in bullets) {
+            val line = TextView(this).apply {
+                text = "- $item"
+                textSize = 13f
+                setTextColor(0xFF9A9A9A.toInt())
+            }
+            container.addView(line)
+        }
+        return container
     }
 
     private fun proceedStartFlow() {
