@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ensureDefaultsFromAsset()
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -177,6 +178,28 @@ class MainActivity : ComponentActivity() {
 //        }
     }
 
+    private fun ensureDefaultsFromAsset() {
+        val uiPrefs = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
+        if (uiPrefs.getBoolean("defaults_loaded", false)) return
+        if (uiPrefs.all.isNotEmpty()) {
+            uiPrefs.edit().putBoolean("defaults_loaded", true).apply()
+            return
+        }
+        try {
+            val json = assets.open("default_config.json").bufferedReader().use { it.readText() }
+            val root = JSONObject(json)
+            root.optJSONObject("ui_config")?.let { applyJsonToPrefs(it, uiPrefs) }
+            root.optJSONObject("floating_positions")?.let {
+                applyJsonToPrefs(it, getSharedPreferences("floating_positions", Context.MODE_PRIVATE))
+            }
+            root.optJSONObject("mirror_positions")?.let {
+                applyJsonToPrefs(it, getSharedPreferences("mirror_positions", Context.MODE_PRIVATE))
+            }
+            uiPrefs.edit().putBoolean("defaults_loaded", true).apply()
+        } catch (_: Throwable) {
+        }
+    }
+
     private fun updateOverlayButtonState() {
         val running = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
             .getBoolean("overlay_running", false)
@@ -243,7 +266,7 @@ class MainActivity : ComponentActivity() {
             Triple("show_drag_btn", "Drag toggle button", R.drawable.ic_drag),
             Triple("show_stop_btn", "Stop overlay button", android.R.drawable.ic_menu_close_clear_cancel),
             Triple("show_hide_btn", "Show/Hide toggle button", R.drawable.ic_eye_open),
-            Triple("show_swap_btn", "Screen swap button", R.drawable.ic_swap),
+            Triple("show_swap_btn", "Screen swap button - Experimental use at your own risk to be fixed in future", R.drawable.ic_swap),
             Triple("show_mirror_btn", "Mirror mode toggle button", R.drawable.ic_mirror),
             Triple("show_trackpad_left", "Left trackpad", R.drawable.trackpad_right),
             Triple("show_trackpad_right", "Right trackpad", R.drawable.trackpad_right)
