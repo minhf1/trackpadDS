@@ -243,6 +243,7 @@ class MainActivity : ComponentActivity() {
             Triple("show_drag_btn", "Drag toggle button", R.drawable.ic_drag),
             Triple("show_stop_btn", "Stop overlay button", android.R.drawable.ic_menu_close_clear_cancel),
             Triple("show_hide_btn", "Show/Hide toggle button", R.drawable.ic_eye_open),
+            Triple("show_swap_btn", "Screen swap button", R.drawable.ic_swap),
             Triple("show_mirror_btn", "Mirror mode toggle button", R.drawable.ic_mirror),
             Triple("show_trackpad_left", "Left trackpad", R.drawable.trackpad_right),
             Triple("show_trackpad_right", "Right trackpad", R.drawable.trackpad_right)

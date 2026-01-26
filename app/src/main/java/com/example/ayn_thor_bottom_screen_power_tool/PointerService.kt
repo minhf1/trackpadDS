@@ -73,7 +73,6 @@ class PointerService : Service() {
     private var navToggleLp: WindowManager.LayoutParams? = null
     private var hideToggleLp: WindowManager.LayoutParams? = null
     private var swapLp: WindowManager.LayoutParams? = null
-    private val enableSwapButton = false
     private var mirrorToggleLp: WindowManager.LayoutParams? = null
     private var dragModeEnabled = false
     private var showNavButtons = true
@@ -127,7 +126,7 @@ class PointerService : Service() {
             1,
             notif,
             ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
         )
 
         if (!uiPrefs.contains("nav_buttons_enabled")) {
@@ -888,7 +887,7 @@ class PointerService : Service() {
             wm.addView(hideToggleView, hideToggleLp)
         }
 
-        if (enableSwapButton && uiPrefs.getBoolean("show_swap_btn", true)) {
+        if (uiPrefs.getBoolean("show_swap_btn", true)) {
             swapLp = createButtonLayoutParams(
                 "nav_swap",
                 sizePx,
@@ -932,10 +931,7 @@ class PointerService : Service() {
         val wantStop = uiPrefs.getBoolean("show_stop_btn", true) && navButtonsEnabled
         val wantDrag = uiPrefs.getBoolean("show_drag_btn", true)
         val wantHide = uiPrefs.getBoolean("show_hide_btn", true)
-        if (!enableSwapButton && uiPrefs.getBoolean("show_swap_btn", false)) {
-            uiPrefs.edit().putBoolean("show_swap_btn", false).apply()
-        }
-        val wantSwap = enableSwapButton && uiPrefs.getBoolean("show_swap_btn", true)
+        val wantSwap = uiPrefs.getBoolean("show_swap_btn", true)
         val wantNavToggle = navToggleVisible
         val wantMirror = uiPrefs.getBoolean("show_mirror_btn", true)
         val showPadLeft = uiPrefs.getBoolean("show_trackpad_left", true)
