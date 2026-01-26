@@ -1,5 +1,6 @@
 # TrackpadDS
 AYN Thor Bottom Screen Power Tool (TrackPadDS) is an Android overlay app that turns the secondary display into configurable trackpads and floating navigation controls. It uses an accessibility service and overlay permissions to drive a cursor, clicks, scrolling, and global actions, with optional screen-mirror mode for touch passthrough. The app includes granular UI controls (visibility, opacity, size, haptics, sensitivity) plus backup/restore of settings and positions.
+
 <img width="956" height="500" alt="image" src="https://github.com/user-attachments/assets/9fef6515-8840-4385-b210-03f8ec279cd4" />
 
 
@@ -11,7 +12,9 @@ AYN Thor Bottom Screen Power Tool (TrackPadDS) is an Android overlay app that tu
 
 ## How to use
 ### Trackpad and action buttons
+
 <img width="980" height="1096" alt="image" src="https://github.com/user-attachments/assets/a4cf0e3c-78ef-4567-a84d-0aaf720340f1" />
+
 - Enable the overlay to add:
   - Left/right trackpads for cursor control.
   - Floating navigation buttons: Back, Recent Apps, Home.
@@ -20,6 +23,7 @@ AYN Thor Bottom Screen Power Tool (TrackPadDS) is an Android overlay app that tu
 - To make an element press-through, hold the show/hide button briefly.
 
 ### Screen mirror mode
+
 <img width="980" height="1092" alt="image" src="https://github.com/user-attachments/assets/f50b4e28-13bf-4fc9-ad33-5b0bea320f23" />
 
 - Enable the mirror toggle to display the primary screen on the bottom screen.
@@ -35,3 +39,5 @@ There are 2 ways you can get the app:
 - Screen mirror mode does not support multi-touch yet.
 - Cursor movable window are shifted to the left.
 - Swap button sometimes swaps AYN system UI apps; it should only swap normal apps.
+
+[![ko-fi](https://www.ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/minxf1)
