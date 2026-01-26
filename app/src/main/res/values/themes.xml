@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.AYN_Thor_bottom_screen_power_tool" parent="android:ThemeOverlay.Material.Dark" />
+    <style name="Theme.DualTrackpad.Floating" parent="Theme.AYN_Thor_bottom_screen_power_tool">
+        <!-- Make it a floating window -->
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowElevation">16dp</item>
+
+        <!-- Optional: remove title -->
+        <item name="android:windowNoTitle">true</item>
+    </style>
+</resources>
