@@ -39,5 +39,6 @@ There are 2 ways you can get the app:
 - Screen mirror mode does not support multi-touch yet.
 - Cursor movable window are shifted to the left.
 - Swap button sometimes swaps AYN system UI apps; it should only swap normal apps.
+- Currently there are a couple of measure to optimize battery use with the app on while screen is closed, however no extended testing have been done.
 
 [![ko-fi](https://www.ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/minxf1)
