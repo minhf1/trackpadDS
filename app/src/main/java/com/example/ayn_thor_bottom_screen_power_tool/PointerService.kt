@@ -46,6 +46,7 @@ class PointerService : Service() {
     private var cursorLp: WindowManager.LayoutParams? = null
     private var cursorTimer: java.util.Timer? = null
     private var cursorView: View? = null
+    private var cursorSizePx = 0
     private var lastCursorX = 0
     private var lastCursorY = 0
     private var lastCursorMoveMs = 0L
@@ -186,6 +187,7 @@ class PointerService : Service() {
         PointerBus.setDisplaySize(metrics.widthPixels, metrics.heightPixels)
 
         val sizePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 36f, metrics).toInt()
+        cursorSizePx = sizePx
 
         cursorView = CursorDotView(displayCtx, sizePx)
         cursorView?.alpha = 0.5f
@@ -200,8 +202,9 @@ class PointerService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = PointerBus.get().x.toInt()
-            y = PointerBus.get().y.toInt()
+            val half = sizePx / 2f
+            x = (PointerBus.get().x - half).toInt()
+            y = (PointerBus.get().y - half).toInt()
         }
 
         cursorWm?.addView(cursorView, cursorLp)
@@ -214,8 +217,9 @@ class PointerService : Service() {
         cursorTimer = fixedRateTimer("cursor", initialDelay = 0L, period = 16L) {
             val s = PointerBus.get()
             val lp = cursorLp ?: return@fixedRateTimer
-            lp.x = s.x.toInt()
-            lp.y = s.y.toInt()
+            val half = cursorSizePx / 2f
+            lp.x = (s.x - half).toInt()
+            lp.y = (s.y - half).toInt()
             try {
                 // Must run on main thread
                 android.os.Handler(Looper.getMainLooper()).post {
@@ -278,6 +282,7 @@ class PointerService : Service() {
         cursorView = null
         cursorWm = null
         cursorLp = null
+        cursorSizePx = 0
     }
 
     private fun attachTrackpadOverlayToSecondary() {
