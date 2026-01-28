@@ -21,6 +21,7 @@
     "show_header_btns": false,
     "show_click_btn": true,
     "show_right_click_btn": true,
+    "click_hold_right_click": true,
     "trackpad_left_width": 461,
     "mirror_show_back": false,
     "show_trackpad_left": true,

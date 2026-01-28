@@ -569,6 +569,28 @@ class MainActivity : ComponentActivity() {
             defaultValue = 1000
         ))
 
+        val trackpadModeHeader = buildSubgroupHeaderRow(
+            title = "Trackpad mode",
+            subtitle = "Behavior while using the trackpad",
+            icon = R.drawable.ic_trackpad_click,
+            flipIcon = false
+        )
+        val trackpadModeOptions = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = LinearLayout.GONE
+            setPadding(0, 6, 0, 0)
+        }
+        trackpadModeHeader.setOnClickListener {
+            trackpadModeOptions.visibility =
+                if (trackpadModeOptions.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
+        }
+        trackpadModeOptions.addView(buildToggleRow(
+            label = "Click button hold for a right-click",
+            key = "click_hold_right_click",
+            icon = R.drawable.ic_trackpad_right_click,
+            prefs = prefs
+        ))
+
         val hapticHeader = buildSubgroupHeaderRow(
             title = "Trackpad haptic feedback",
             subtitle = "Trackpad and overlay vibration controls",
@@ -633,6 +655,9 @@ class MainActivity : ComponentActivity() {
 
         options.addView(trackpadHeader)
         options.addView(trackpadOptions)
+        options.addView(space(8))
+        options.addView(trackpadModeHeader)
+        options.addView(trackpadModeOptions)
         options.addView(space(8))
         options.addView(hapticHeader)
         options.addView(hapticOptions)

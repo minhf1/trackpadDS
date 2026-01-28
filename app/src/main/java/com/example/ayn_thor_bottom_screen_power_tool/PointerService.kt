@@ -1122,8 +1122,10 @@ class PointerService : Service() {
             metrics,
             allowTapWhenDragEnabled = false,
             onLongPress = {
-                val s = PointerBus.get()
-                PointerAccessibilityService.instance?.rightClickAt(s.x, s.y)
+                if (uiPrefs.getBoolean("click_hold_right_click", true)) {
+                    val s = PointerBus.get()
+                    PointerAccessibilityService.instance?.rightClickAt(s.x, s.y)
+                }
                 true
             }
         )
