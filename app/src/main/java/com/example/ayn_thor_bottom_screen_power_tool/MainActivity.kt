@@ -320,6 +320,8 @@ class MainActivity : ComponentActivity() {
             Triple("show_hide_btn", "Show/Hide toggle button", R.drawable.ic_eye_open),
             Triple("show_swap_btn", "Screen swap button - Experimental use at your own risk to be fixed in future", R.drawable.ic_swap),
             Triple("show_mirror_btn", "Mirror mode toggle button", R.drawable.ic_mirror),
+            Triple("show_click_btn", "Click button", R.drawable.ic_trackpad_click),
+            Triple("show_right_click_btn", "Right-click button", R.drawable.ic_trackpad_right_click),
             Triple("show_trackpad_left", "Left trackpad", R.drawable.trackpad_right),
             Triple("show_trackpad_right", "Right trackpad", R.drawable.trackpad_right)
         )

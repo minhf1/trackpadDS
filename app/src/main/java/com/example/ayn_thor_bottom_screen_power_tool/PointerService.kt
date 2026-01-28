@@ -66,6 +66,8 @@ class PointerService : Service() {
     private var hideToggleView: ImageButton? = null
     private var swapView: ImageButton? = null
     private var mirrorToggleView: ImageButton? = null
+    private var clickView: ImageButton? = null
+    private var rightClickView: ImageButton? = null
     private var backLp: WindowManager.LayoutParams? = null
     private var homeLp: WindowManager.LayoutParams? = null
     private var recentsLp: WindowManager.LayoutParams? = null
@@ -75,6 +77,8 @@ class PointerService : Service() {
     private var hideToggleLp: WindowManager.LayoutParams? = null
     private var swapLp: WindowManager.LayoutParams? = null
     private var mirrorToggleLp: WindowManager.LayoutParams? = null
+    private var clickLp: WindowManager.LayoutParams? = null
+    private var rightClickLp: WindowManager.LayoutParams? = null
     private var dragModeEnabled = false
     private var showNavButtons = true
     private var hideOverlays = false
@@ -593,6 +597,8 @@ class PointerService : Service() {
             try { if (hideToggleView != null) wm.removeView(hideToggleView) } catch (_: Throwable) {}
             try { if (swapView != null) wm.removeView(swapView) } catch (_: Throwable) {}
             try { if (mirrorToggleView != null) wm.removeView(mirrorToggleView) } catch (_: Throwable) {}
+            try { if (clickView != null) wm.removeView(clickView) } catch (_: Throwable) {}
+            try { if (rightClickView != null) wm.removeView(rightClickView) } catch (_: Throwable) {}
         }
         padViewA = null
         padViewB = null
@@ -614,6 +620,8 @@ class PointerService : Service() {
         hideToggleView = null
         swapView = null
         mirrorToggleView = null
+        clickView = null
+        rightClickView = null
         backLp = null
         homeLp = null
         recentsLp = null
@@ -623,6 +631,8 @@ class PointerService : Service() {
         hideToggleLp = null
         swapLp = null
         mirrorToggleLp = null
+        clickLp = null
+        rightClickLp = null
     }
 
     private fun createFloatingButton(
@@ -639,7 +649,7 @@ class PointerService : Service() {
             }
             setImageResource(icon)
             setColorFilter(Color.WHITE)
-            scaleType = ImageView.ScaleType.CENTER
+            scaleType = ImageView.ScaleType.FIT_CENTER
             setOnClickListener {
                 if (uiPrefs.getBoolean("haptic_button_press", true)) {
                     performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
@@ -939,6 +949,8 @@ class PointerService : Service() {
         val wantSwap = uiPrefs.getBoolean("show_swap_btn", true)
         val wantNavToggle = navToggleVisible
         val wantMirror = uiPrefs.getBoolean("show_mirror_btn", true)
+        val wantClick = uiPrefs.getBoolean("show_click_btn", true)
+        val wantRightClick = uiPrefs.getBoolean("show_right_click_btn", true)
         val showPadLeft = uiPrefs.getBoolean("show_trackpad_left", true)
         val showPadRight = uiPrefs.getBoolean("show_trackpad_right", true)
         buttonOpacity = uiPrefs.getInt("button_opacity", 100).coerceIn(0, 100)
@@ -1094,6 +1106,45 @@ class PointerService : Service() {
             metrics
         )
 
+        updateFloatingButtonState(
+            wantClick,
+            clickView,
+            clickLp,
+            "nav_click",
+            R.drawable.ic_trackpad_click,
+            Color.argb(buttonOpacity * 255 / 100, 60, 60, 60),
+            {
+                val s = PointerBus.get()
+                PointerAccessibilityService.instance?.clickAt(s.x, s.y)
+            },
+            wm,
+            ctx,
+            metrics,
+            allowTapWhenDragEnabled = false,
+            onLongPress = {
+                val s = PointerBus.get()
+                PointerAccessibilityService.instance?.rightClickAt(s.x, s.y)
+                true
+            }
+        )
+
+        updateFloatingButtonState(
+            wantRightClick,
+            rightClickView,
+            rightClickLp,
+            "nav_right_click",
+            R.drawable.ic_trackpad_right_click,
+            Color.argb(buttonOpacity * 255 / 100, 60, 60, 60),
+            {
+                val s = PointerBus.get()
+                PointerAccessibilityService.instance?.rightClickAt(s.x, s.y)
+            },
+            wm,
+            ctx,
+            metrics,
+            allowTapWhenDragEnabled = false
+        )
+
         bringFloatingButtonsToFront()
         updateDragToggleAppearance()
         updateDragModeVisuals()
@@ -1128,6 +1179,8 @@ class PointerService : Service() {
         updateOverlayPosition("nav_hide", hideToggleView, hideToggleLp, wm)
         updateOverlayPosition("nav_swap", swapView, swapLp, wm)
         updateOverlayPosition("nav_mirror", mirrorToggleView, mirrorToggleLp, wm)
+        updateOverlayPosition("nav_click", clickView, clickLp, wm)
+        updateOverlayPosition("nav_right_click", rightClickView, rightClickLp, wm)
     }
 
     private fun updateOverlayPosition(
@@ -1229,6 +1282,8 @@ class PointerService : Service() {
                 "nav_hide" -> 6
                 "nav_swap" -> 7
                 "nav_mirror" -> 8
+                "nav_click" -> 9
+                "nav_right_click" -> 10
                 else -> 0
             }
             val lp = createButtonLayoutParams(
@@ -1264,6 +1319,8 @@ class PointerService : Service() {
                 "nav_hide" -> { hideToggleView = view; hideToggleLp = lp }
                 "nav_swap" -> { swapView = view; swapLp = lp }
                 "nav_mirror" -> { mirrorToggleView = view; mirrorToggleLp = lp }
+                "nav_click" -> { clickView = view; clickLp = lp }
+                "nav_right_click" -> { rightClickView = view; rightClickLp = lp }
             }
         } else {
             when (key) {
@@ -1276,6 +1333,8 @@ class PointerService : Service() {
                 "nav_hide" -> { removeFloatingButton(wm, currentView); hideToggleView = null; hideToggleLp = null }
                 "nav_swap" -> { removeFloatingButton(wm, currentView); swapView = null; swapLp = null }
                 "nav_mirror" -> { removeFloatingButton(wm, currentView); mirrorToggleView = null; mirrorToggleLp = null }
+                "nav_click" -> { removeFloatingButton(wm, currentView); clickView = null; clickLp = null }
+                "nav_right_click" -> { removeFloatingButton(wm, currentView); rightClickView = null; rightClickLp = null }
             }
         }
     }
@@ -1717,6 +1776,8 @@ class PointerService : Service() {
         updateClickThroughFor(wm, navToggleView, navToggleLp, clickThroughEnabled)
         updateClickThroughFor(wm, swapView, swapLp, clickThroughEnabled)
         updateClickThroughFor(wm, mirrorToggleView, mirrorToggleLp, clickThroughEnabled)
+        updateClickThroughFor(wm, clickView, clickLp, clickThroughEnabled)
+        updateClickThroughFor(wm, rightClickView, rightClickLp, clickThroughEnabled)
         // Keep hideToggleView clickable so it can be turned back on.
     }
 
@@ -1751,6 +1812,8 @@ class PointerService : Service() {
         readdFloatingButton(wm, hideToggleView, hideToggleLp)
         readdFloatingButton(wm, swapView, swapLp)
         readdFloatingButton(wm, mirrorToggleView, mirrorToggleLp)
+        readdFloatingButton(wm, clickView, clickLp)
+        readdFloatingButton(wm, rightClickView, rightClickLp)
     }
 
     private fun readdFloatingButton(

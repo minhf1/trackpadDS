@@ -102,6 +102,16 @@ class PointerAccessibilityService : AccessibilityService() {
         dispatchGesture(gesture, null, null)
     }
 
+    fun rightClickAt(x: Float, y: Float) {
+        val path = Path().apply {
+            moveTo(x, y)
+            lineTo(x + 0.1f, y + 0.1f)
+        }
+        val stroke = GestureDescription.StrokeDescription(path, 0, 450)
+        val gesture = GestureDescription.Builder().addStroke(stroke).build()
+        dispatchGesture(gesture, null, null)
+    }
+
     fun mirrorTouchDown(x: Float, y: Float) {
         val path = Path().apply {
             moveTo(x, y)
