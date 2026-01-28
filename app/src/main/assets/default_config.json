@@ -1,7 +1,7 @@
 {
   "version": 1,
   "ui_config": {
-    "show_drag_btn": false,
+    "show_drag_btn": true,
     "overlay_running": false,
     "show_trackpad_right": true,
     "button_opacity": 100,
@@ -19,6 +19,8 @@
     "show_back_btn": true,
     "show_swap_btn": false,
     "show_header_btns": false,
+    "show_click_btn": true,
+    "show_right_click_btn": true,
     "trackpad_left_width": 461,
     "mirror_show_back": false,
     "show_trackpad_left": true,
@@ -50,7 +52,11 @@
     "nav_mirror_x": 0,
     "nav_drag_y": 230,
     "pad_b_y": 619,
-    "nav_hide_y": 974
+    "nav_hide_y": 974,
+    "nav_click_x": 781,
+    "nav_click_y": 615,
+    "nav_right_click_x": 352,
+    "nav_right_click_y": 616
   },
   "mirror_positions": {
     "mirror_drag_x": 1139,
