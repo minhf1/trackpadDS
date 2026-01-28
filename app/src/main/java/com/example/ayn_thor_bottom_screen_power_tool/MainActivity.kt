@@ -590,6 +590,12 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.ic_trackpad_right_click,
             prefs = prefs
         ))
+        trackpadModeOptions.addView(buildToggleRow(
+            label = "Trackpad click muti-touch support",
+            key = "trackpad_click_multitouch",
+            icon = R.drawable.ic_trackpad_click,
+            prefs = prefs
+        ))
 
         val hapticHeader = buildSubgroupHeaderRow(
             title = "Trackpad haptic feedback",

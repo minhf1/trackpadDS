@@ -31,6 +31,11 @@ class TrackpadView(ctx: android.content.Context) : View(ctx) {
     private var downTime = 0L
     private var downX = 0f
     private var downY = 0f
+    private var primaryPointerId: Int? = null
+    private val pointerDownTime = mutableMapOf<Int, Long>()
+    private val pointerDownX = mutableMapOf<Int, Float>()
+    private val pointerDownY = mutableMapOf<Int, Float>()
+    private var hasTwoFingerScroll = false
 
     private fun centroidY(e: MotionEvent): Float {
         var sum = 0f
@@ -61,6 +66,7 @@ class TrackpadView(ctx: android.content.Context) : View(ctx) {
                 filteredScrollY = 0f
                 isTwoFinger = false
                 hasTwoFingerGesture = false
+                hasTwoFingerScroll = false
 
                 if (needsFocusSwipe && uiPrefs.getBoolean("auto_focus_primary_on_touch", true)) {
                     val s = PointerBus.get()
@@ -74,13 +80,41 @@ class TrackpadView(ctx: android.content.Context) : View(ctx) {
                 downTime = e.eventTime
                 downX = e.x
                 downY = e.y
+                primaryPointerId = e.getPointerId(0)
+                primaryPointerId?.let { pointerId ->
+                    pointerDownTime[pointerId] = e.eventTime
+                    pointerDownX[pointerId] = e.x
+                    pointerDownY[pointerId] = e.y
+                }
                 return true
             }
 
             MotionEvent.ACTION_POINTER_UP -> {
+                val multiTouchClickEnabled =
+                    uiPrefs.getBoolean("trackpad_click_multitouch", true)
                 // After a pointer-up, MotionEvent still reports the old pointerCount
                 // during this callback. Effective count will be pointerCount - 1.
                 val remaining = e.pointerCount - 1
+                val pointerId = e.getPointerId(e.actionIndex)
+                if (multiTouchClickEnabled &&
+                    remaining >= 1 &&
+                    pointerId != primaryPointerId &&
+                    !hasTwoFingerScroll) {
+                    val dt = e.eventTime - (pointerDownTime[pointerId] ?: e.eventTime)
+                    val dist =
+                        abs(e.getX(e.actionIndex) - (pointerDownX[pointerId] ?: e.getX(e.actionIndex))) +
+                            abs(e.getY(e.actionIndex) - (pointerDownY[pointerId] ?: e.getY(e.actionIndex)))
+                    if (dt < 200 && dist < 20f) {
+                        val s = PointerBus.get()
+                        if (uiPrefs.getBoolean("haptic_trackpad_press", true)) {
+                            performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                        }
+                        PointerAccessibilityService.instance?.clickAt(s.x, s.y)
+                    }
+                }
+                pointerDownTime.remove(pointerId)
+                pointerDownX.remove(pointerId)
+                pointerDownY.remove(pointerId)
                 if (remaining < 2) {
                     isScrolling = false
                     scrollAccumulatorX = 0f
@@ -88,19 +122,26 @@ class TrackpadView(ctx: android.content.Context) : View(ctx) {
                     filteredScrollX = 0f
                     filteredScrollY = 0f
                     isTwoFinger = false
+                    hasTwoFingerScroll = false
                     if (remaining == 1) {
                         val remainingIndex = if (e.actionIndex == 0) 1 else 0
                         lastX = e.getX(remainingIndex)
                         lastY = e.getY(remainingIndex)
+                        primaryPointerId = e.getPointerId(remainingIndex)
                     }
                 }
                 return true
             }
 
             MotionEvent.ACTION_POINTER_DOWN -> {
+                val pointerId = e.getPointerId(e.actionIndex)
+                pointerDownTime[pointerId] = e.eventTime
+                pointerDownX[pointerId] = e.getX(e.actionIndex)
+                pointerDownY[pointerId] = e.getY(e.actionIndex)
                 if (e.pointerCount == 2) {
                     isTwoFinger = true
                     hasTwoFingerGesture = true
+                    hasTwoFingerScroll = false
 
                     isScrolling = true
                     lastScrollX = centroidX(e)
@@ -162,6 +203,7 @@ class TrackpadView(ctx: android.content.Context) : View(ctx) {
                         val s = PointerBus.get()
                         PointerAccessibilityService.instance
                             ?.scrollAt(s.x, s.y, scrollDeltaX, scrollDeltaY, s.displayW, s.displayH)
+                        hasTwoFingerScroll = true
                         val dirX = when {
                             scrollDeltaX > 0f -> 1
                             scrollDeltaX < 0f -> -1
@@ -213,7 +255,12 @@ class TrackpadView(ctx: android.content.Context) : View(ctx) {
                 filteredScrollY = 0f
                 isTwoFinger = false
                 hasTwoFingerGesture = false
+                hasTwoFingerScroll = false
                 needsFocusSwipe = true
+                primaryPointerId = null
+                pointerDownTime.clear()
+                pointerDownX.clear()
+                pointerDownY.clear()
                 return true
             }
 
@@ -225,7 +272,12 @@ class TrackpadView(ctx: android.content.Context) : View(ctx) {
                 filteredScrollY = 0f
                 isTwoFinger = false
                 hasTwoFingerGesture = false
+                hasTwoFingerScroll = false
                 needsFocusSwipe = true
+                primaryPointerId = null
+                pointerDownTime.clear()
+                pointerDownX.clear()
+                pointerDownY.clear()
                 return true
             }
 
