@@ -55,8 +55,10 @@ class PointerService : Service() {
     private var padWm: WindowManager? = null
     private var padViewA: View? = null
     private var padViewB: View? = null
-    private var padLpA: WindowManager.LayoutParams? = null
-    private var padLpB: WindowManager.LayoutParams? = null
+    private var padLpA: FrameLayout.LayoutParams? = null
+    private var padLpB: FrameLayout.LayoutParams? = null
+    private var padOverlayView: FrameLayout? = null
+    private var padOverlayLp: WindowManager.LayoutParams? = null
     private var backView: ImageButton? = null
     private var homeView: ImageButton? = null
     private var recentsView: ImageButton? = null
@@ -68,17 +70,17 @@ class PointerService : Service() {
     private var mirrorToggleView: ImageButton? = null
     private var clickView: ImageButton? = null
     private var rightClickView: ImageButton? = null
-    private var backLp: WindowManager.LayoutParams? = null
-    private var homeLp: WindowManager.LayoutParams? = null
-    private var recentsLp: WindowManager.LayoutParams? = null
-    private var closeLp: WindowManager.LayoutParams? = null
-    private var dragToggleLp: WindowManager.LayoutParams? = null
-    private var navToggleLp: WindowManager.LayoutParams? = null
-    private var hideToggleLp: WindowManager.LayoutParams? = null
-    private var swapLp: WindowManager.LayoutParams? = null
-    private var mirrorToggleLp: WindowManager.LayoutParams? = null
-    private var clickLp: WindowManager.LayoutParams? = null
-    private var rightClickLp: WindowManager.LayoutParams? = null
+    private var backLp: FrameLayout.LayoutParams? = null
+    private var homeLp: FrameLayout.LayoutParams? = null
+    private var recentsLp: FrameLayout.LayoutParams? = null
+    private var closeLp: FrameLayout.LayoutParams? = null
+    private var dragToggleLp: FrameLayout.LayoutParams? = null
+    private var navToggleLp: FrameLayout.LayoutParams? = null
+    private var hideToggleLp: FrameLayout.LayoutParams? = null
+    private var swapLp: FrameLayout.LayoutParams? = null
+    private var mirrorToggleLp: FrameLayout.LayoutParams? = null
+    private var clickLp: FrameLayout.LayoutParams? = null
+    private var rightClickLp: FrameLayout.LayoutParams? = null
     private var dragModeEnabled = false
     private var showNavButtons = true
     private var hideOverlays = false
@@ -291,7 +293,7 @@ class PointerService : Service() {
 
     private fun attachTrackpadOverlayToSecondary() {
         if (mirrorActive) return
-        if (padViewA != null || padViewB != null) return
+        if (padOverlayView != null) return
         val dm = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
         val secondary = dm.displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
             ?: return
@@ -300,6 +302,38 @@ class PointerService : Service() {
         padWm = displayCtx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
         val metrics = displayCtx.resources.displayMetrics
+        val realMetrics = android.util.DisplayMetrics()
+        @Suppress("DEPRECATION")
+        secondary.getRealMetrics(realMetrics)
+        val displayW = realMetrics.widthPixels
+        val displayH = realMetrics.heightPixels
+
+        val overlay = FrameLayout(displayCtx).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            isClickable = false
+            isFocusable = false
+            isMotionEventSplittingEnabled = true
+            clipChildren = false
+            clipToPadding = false
+        }
+        padOverlayView = overlay
+        padOverlayLp = WindowManager.LayoutParams(
+            displayW,
+            displayH,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = 0
+        }
+        padWm?.addView(overlay, padOverlayLp)
 
         val defaultPadWidth = dp(metrics, 200)
         val defaultPadHeight = dp(metrics, 200)
@@ -313,8 +347,6 @@ class PointerService : Service() {
             defaultPadWidth,
             defaultPadHeight
         )
-        val displayW = metrics.widthPixels
-        val displayH = metrics.heightPixels
         val (padAWidth, padAHeight) = clampTrackpadSize(metrics, rawPadAWidth, rawPadAHeight)
         val (padBWidth, padBHeight) = clampTrackpadSize(metrics, rawPadBWidth, rawPadBHeight)
         if (padAWidth != rawPadAWidth || padAHeight != rawPadAHeight) {
@@ -327,67 +359,45 @@ class PointerService : Service() {
 
         val padADefaultX = margin
         val padADefaultY = (displayH - padAHeight - margin).coerceAtLeast(0)
-        val (padAX, padAY) = loadPosition("pad_a", padADefaultX, padADefaultY)
-        padLpA = WindowManager.LayoutParams(
-            padAWidth,
-            padAHeight,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = padAX
-            y = padAY
-        }
+        padLpA = createOverlayLayoutParams("pad_a", padAWidth, padAHeight, padADefaultX, padADefaultY)
 
         val padBDefaultX = (displayW - padBWidth - margin).coerceAtLeast(0)
         val padBDefaultY = (displayH - padBHeight - margin).coerceAtLeast(0)
-        val (padBX, padBY) = loadPosition("pad_b", padBDefaultX, padBDefaultY)
-        padLpB = WindowManager.LayoutParams(
-            padBWidth,
-            padBHeight,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = padBX
-            y = padBY
-        }
+        padLpB = createOverlayLayoutParams("pad_b", padBWidth, padBHeight, padBDefaultX, padBDefaultY)
 
         padViewA = buildFloatingTrackpadView(displayCtx, isLeft = false)
         padViewB = buildFloatingTrackpadView(displayCtx, isLeft = true)
 
-        padWm?.addView(padViewA, padLpA)
-        padWm?.addView(padViewB, padLpB)
-        padViewA?.setOnTouchListener(
-            TrackpadDragTouchListener(
-                "pad_a",
-                "trackpad_right",
-                setOf(ResizeCorner.TOP_LEFT, ResizeCorner.BOTTOM_RIGHT),
-                { padLpA },
-                { lp ->
-                    padLpA = lp
-                    try { padWm?.updateViewLayout(padViewA, lp) } catch (_: Throwable) {}
-                }
+        padViewA?.let { view ->
+            overlay.addView(view, padLpA)
+            view.setOnTouchListener(
+                TrackpadDragTouchListener(
+                    "pad_a",
+                    "trackpad_right",
+                    setOf(ResizeCorner.TOP_LEFT, ResizeCorner.BOTTOM_RIGHT),
+                    { padLpA },
+                    { lp ->
+                        padLpA = lp
+                        view.layoutParams = lp
+                    }
+                )
             )
-        )
-        padViewB?.setOnTouchListener(
-            TrackpadDragTouchListener(
-                "pad_b",
-                "trackpad_left",
-                setOf(ResizeCorner.TOP_RIGHT, ResizeCorner.BOTTOM_LEFT),
-                { padLpB },
-                { lp ->
-                    padLpB = lp
-                    try { padWm?.updateViewLayout(padViewB, lp) } catch (_: Throwable) {}
-                }
+        }
+        padViewB?.let { view ->
+            overlay.addView(view, padLpB)
+            view.setOnTouchListener(
+                TrackpadDragTouchListener(
+                    "pad_b",
+                    "trackpad_left",
+                    setOf(ResizeCorner.TOP_RIGHT, ResizeCorner.BOTTOM_LEFT),
+                    { padLpB },
+                    { lp ->
+                        padLpB = lp
+                        view.layoutParams = lp
+                    }
+                )
             )
-        )
+        }
         attachNavButtonsToSecondary(displayCtx, metrics)
         bringFloatingButtonsToFront()
         updateDragModeVisuals()
@@ -586,24 +596,14 @@ class PointerService : Service() {
     private fun detachTrackpad() {
         val wm = padWm
         if (wm != null) {
-            try { if (padViewA != null) wm.removeView(padViewA) } catch (_: Throwable) {}
-            try { if (padViewB != null) wm.removeView(padViewB) } catch (_: Throwable) {}
-            try { if (backView != null) wm.removeView(backView) } catch (_: Throwable) {}
-            try { if (homeView != null) wm.removeView(homeView) } catch (_: Throwable) {}
-            try { if (recentsView != null) wm.removeView(recentsView) } catch (_: Throwable) {}
-            try { if (closeView != null) wm.removeView(closeView) } catch (_: Throwable) {}
-            try { if (dragToggleView != null) wm.removeView(dragToggleView) } catch (_: Throwable) {}
-            try { if (navToggleView != null) wm.removeView(navToggleView) } catch (_: Throwable) {}
-            try { if (hideToggleView != null) wm.removeView(hideToggleView) } catch (_: Throwable) {}
-            try { if (swapView != null) wm.removeView(swapView) } catch (_: Throwable) {}
-            try { if (mirrorToggleView != null) wm.removeView(mirrorToggleView) } catch (_: Throwable) {}
-            try { if (clickView != null) wm.removeView(clickView) } catch (_: Throwable) {}
-            try { if (rightClickView != null) wm.removeView(rightClickView) } catch (_: Throwable) {}
+            try { if (padOverlayView != null) wm.removeView(padOverlayView) } catch (_: Throwable) {}
         }
         padViewA = null
         padViewB = null
         padLpA = null
         padLpB = null
+        padOverlayView = null
+        padOverlayLp = null
         trackpadCards.clear()
         trackpadSurfaces.clear()
         trackpadResizeHandles.clear()
@@ -642,6 +642,7 @@ class PointerService : Service() {
         bgColor: Int,
         action: () -> Unit
     ): ImageButton {
+        val elevationPx = dp(ctx.resources.displayMetrics, 16).toFloat()
         return ImageButton(ctx).apply {
             background = GradientDrawable().apply {
                 cornerRadius = (sizePx / 2f)
@@ -650,6 +651,8 @@ class PointerService : Service() {
             setImageResource(icon)
             setColorFilter(Color.WHITE)
             scaleType = ImageView.ScaleType.FIT_CENTER
+            elevation = elevationPx
+            translationZ = elevationPx
             setOnClickListener {
                 if (uiPrefs.getBoolean("haptic_button_press", true)) {
                     performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
@@ -815,7 +818,7 @@ class PointerService : Service() {
         ctx: Context,
         metrics: android.util.DisplayMetrics
     ) {
-        val wm = padWm ?: return
+        val overlay = padOverlayView ?: return
         if (dragToggleView != null || backView != null || homeView != null || recentsView != null || closeView != null) {
             return
         }
@@ -836,14 +839,15 @@ class PointerService : Service() {
         }
         showNavButtons = navButtonsEnabled
         if (navButtonsEnabled) {
-            showNavButtonCluster(ctx, wm, sizePx, gapPx, baseX, baseY, defaultColor, closeColor)
+            showNavButtonCluster(ctx, overlay, sizePx, gapPx, baseX, baseY, defaultColor, closeColor)
         }
 
         dragModeEnabled = uiPrefs.getBoolean("drag_mode_enabled", false)
         dragEnabled = dragModeEnabled
         if (uiPrefs.getBoolean("show_drag_btn", true)) {
-            dragToggleLp = createButtonLayoutParams(
+            dragToggleLp = createOverlayLayoutParams(
                 "nav_drag",
+                sizePx,
                 sizePx,
                 baseX + 4 * (sizePx + gapPx),
                 baseY
@@ -861,18 +865,19 @@ class PointerService : Service() {
                     { dragToggleLp },
                     { lp ->
                         dragToggleLp = lp
-                        wm.updateViewLayout(dragToggleView, lp)
+                        dragToggleView?.layoutParams = lp
                     },
                     allowTapWhenDragEnabled = true
                 )
             )
             updateDragToggleAppearance()
-            wm.addView(dragToggleView, dragToggleLp)
+            overlay.addView(dragToggleView, dragToggleLp)
         }
 
         if (uiPrefs.getBoolean("show_hide_btn", true)) {
-            hideToggleLp = createButtonLayoutParams(
+            hideToggleLp = createOverlayLayoutParams(
                 "nav_hide",
+                sizePx,
                 sizePx,
                 baseX + 6 * (sizePx + gapPx),
                 baseY
@@ -894,17 +899,18 @@ class PointerService : Service() {
                     { hideToggleLp },
                     { lp ->
                         hideToggleLp = lp
-                        wm.updateViewLayout(hideToggleView, lp)
+                        hideToggleView?.layoutParams = lp
                     },
                     allowTapWhenDragEnabled = false
                 )
             )
-            wm.addView(hideToggleView, hideToggleLp)
+            overlay.addView(hideToggleView, hideToggleLp)
         }
 
         if (uiPrefs.getBoolean("show_swap_btn", true)) {
-            swapLp = createButtonLayoutParams(
+            swapLp = createOverlayLayoutParams(
                 "nav_swap",
+                sizePx,
                 sizePx,
                 baseX + 7 * (sizePx + gapPx),
                 baseY
@@ -919,17 +925,17 @@ class PointerService : Service() {
                     { swapLp },
                     { lp ->
                         swapLp = lp
-                        wm.updateViewLayout(swapView, lp)
+                        swapView?.layoutParams = lp
                     }
                 )
             )
-            wm.addView(swapView, swapLp)
+            overlay.addView(swapView, swapLp)
         }
     }
 
     private fun applyUiConfig() {
         if (mirrorActive) return
-        val wm = padWm ?: return
+        val overlay = padOverlayView ?: return
         val ctx = padViewA?.context ?: padViewB?.context ?: return
         val metrics = ctx.resources.displayMetrics
 
@@ -968,7 +974,7 @@ class PointerService : Service() {
             R.drawable.ic_back,
             Color.argb(buttonOpacity * 255 / 100, 60, 60, 60),
             { PointerAccessibilityService.instance?.performGlobalAction(GLOBAL_ACTION_BACK) },
-            wm,
+            overlay,
             ctx,
             metrics
         )
@@ -980,7 +986,7 @@ class PointerService : Service() {
             R.drawable.ic_home,
             Color.argb(buttonOpacity * 255 / 100, 60, 60, 60),
             { PointerAccessibilityService.instance?.performGlobalAction(GLOBAL_ACTION_HOME) },
-            wm,
+            overlay,
             ctx,
             metrics
         )
@@ -992,7 +998,7 @@ class PointerService : Service() {
             R.drawable.ic_menu,
             Color.argb(buttonOpacity * 255 / 100, 60, 60, 60),
             { PointerAccessibilityService.instance?.performGlobalAction(GLOBAL_ACTION_RECENTS) },
-            wm,
+            overlay,
             ctx,
             metrics
         )
@@ -1006,7 +1012,7 @@ class PointerService : Service() {
             {
                 stopOverlayAndSelf()
             },
-            wm,
+            overlay,
             ctx,
             metrics
         )
@@ -1025,7 +1031,7 @@ class PointerService : Service() {
                 updateDragToggleAppearance()
                 updateDragModeVisuals()
             },
-            wm,
+            overlay,
             ctx,
             metrics,
             allowTapWhenDragEnabled = true
@@ -1043,7 +1049,7 @@ class PointerService : Service() {
                     toggleHideOverlays()
                 }
             },
-            wm,
+            overlay,
             ctx,
             metrics,
             allowTapWhenDragEnabled = false,
@@ -1067,7 +1073,7 @@ class PointerService : Service() {
                     toggleNavButtons()
                 }
             },
-            wm,
+            overlay,
             ctx,
             metrics
         )
@@ -1083,7 +1089,7 @@ class PointerService : Service() {
                 android.util.Log.d("PointerService", "Swap button pressed")
                 swapTopTasksBetweenDisplays()
             },
-            wm,
+            overlay,
             ctx,
             metrics
         )
@@ -1101,7 +1107,7 @@ class PointerService : Service() {
                     openMirrorPermission()
                 }
             },
-            wm,
+            overlay,
             ctx,
             metrics
         )
@@ -1117,7 +1123,7 @@ class PointerService : Service() {
                 val s = PointerBus.get()
                 PointerAccessibilityService.instance?.clickAt(s.x, s.y)
             },
-            wm,
+            overlay,
             ctx,
             metrics,
             allowTapWhenDragEnabled = false,
@@ -1141,7 +1147,7 @@ class PointerService : Service() {
                 val s = PointerBus.get()
                 PointerAccessibilityService.instance?.rightClickAt(s.x, s.y)
             },
-            wm,
+            overlay,
             ctx,
             metrics,
             allowTapWhenDragEnabled = false
@@ -1154,10 +1160,10 @@ class PointerService : Service() {
         updateClickThrough()
         updateButtonOpacity(buttonOpacity)
         updateTrackpadOpacity(trackpadOpacity)
-        applyTrackpadSizes(wm, metrics)
+        applyTrackpadSizes(metrics)
         updateTrackpadHeaderVisibility(!navButtonsEnabled)
-        updateTrackpadVisibility(padViewA, padLpA, showPadRight, wm)
-        updateTrackpadVisibility(padViewB, padLpB, showPadLeft, wm)
+        updateTrackpadVisibility(padViewA, padLpA, showPadRight)
+        updateTrackpadVisibility(padViewB, padLpB, showPadLeft)
     }
 
     private fun updateTrackpadHeaderVisibility(showHeader: Boolean) {
@@ -1169,63 +1175,48 @@ class PointerService : Service() {
     }
 
     private fun applyOverlayPositions() {
-        val wm = padWm ?: return
-        updateOverlayPosition("pad_a", padViewA, padLpA, wm)
-        updateOverlayPosition("pad_b", padViewB, padLpB, wm)
-        updateOverlayPosition("nav_back", backView, backLp, wm)
-        updateOverlayPosition("nav_home", homeView, homeLp, wm)
-        updateOverlayPosition("nav_recents", recentsView, recentsLp, wm)
-        updateOverlayPosition("nav_close", closeView, closeLp, wm)
-        updateOverlayPosition("nav_drag", dragToggleView, dragToggleLp, wm)
-        updateOverlayPosition("nav_toggle", navToggleView, navToggleLp, wm)
-        updateOverlayPosition("nav_hide", hideToggleView, hideToggleLp, wm)
-        updateOverlayPosition("nav_swap", swapView, swapLp, wm)
-        updateOverlayPosition("nav_mirror", mirrorToggleView, mirrorToggleLp, wm)
-        updateOverlayPosition("nav_click", clickView, clickLp, wm)
-        updateOverlayPosition("nav_right_click", rightClickView, rightClickLp, wm)
+        updateOverlayPosition("pad_a", padViewA, padLpA)
+        updateOverlayPosition("pad_b", padViewB, padLpB)
+        updateOverlayPosition("nav_back", backView, backLp)
+        updateOverlayPosition("nav_home", homeView, homeLp)
+        updateOverlayPosition("nav_recents", recentsView, recentsLp)
+        updateOverlayPosition("nav_close", closeView, closeLp)
+        updateOverlayPosition("nav_drag", dragToggleView, dragToggleLp)
+        updateOverlayPosition("nav_toggle", navToggleView, navToggleLp)
+        updateOverlayPosition("nav_hide", hideToggleView, hideToggleLp)
+        updateOverlayPosition("nav_swap", swapView, swapLp)
+        updateOverlayPosition("nav_mirror", mirrorToggleView, mirrorToggleLp)
+        updateOverlayPosition("nav_click", clickView, clickLp)
+        updateOverlayPosition("nav_right_click", rightClickView, rightClickLp)
     }
 
     private fun updateOverlayPosition(
         key: String,
         view: View?,
-        lp: WindowManager.LayoutParams?,
-        wm: WindowManager
+        lp: FrameLayout.LayoutParams?
     ) {
         if (view == null || lp == null) return
-        val (rawX, rawY) = loadPosition(key, lp.x, lp.y)
+        val (rawX, rawY) = loadPosition(key, lp.leftMargin, lp.topMargin)
         val (maxX, maxY) = getDragBounds(view, lp)
         val newX = rawX.coerceIn(0, maxX.coerceAtLeast(0))
         val newY = rawY.coerceIn(0, maxY.coerceAtLeast(0))
-        if (newX != lp.x || newY != lp.y) {
-            lp.x = newX
-            lp.y = newY
-            try {
-                wm.updateViewLayout(view, lp)
-            } catch (_: Throwable) {
-            }
+        if (newX != lp.leftMargin || newY != lp.topMargin) {
+            lp.leftMargin = newX
+            lp.topMargin = newY
+            view.layoutParams = lp
         }
     }
 
     private fun updateTrackpadVisibility(
         view: View?,
-        lp: WindowManager.LayoutParams?,
-        show: Boolean,
-        wm: WindowManager
+        lp: FrameLayout.LayoutParams?,
+        show: Boolean
     ) {
         if (view == null || lp == null) return
+        view.visibility = if (show) View.VISIBLE else View.GONE
         view.alpha = if (show) 1f else 0f
-        val newFlags = if (show) {
-            lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-        } else {
-            lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-        }
-        if (newFlags != lp.flags) {
-            lp.flags = newFlags
-            try {
-                wm.updateViewLayout(view, lp)
-            } catch (_: Throwable) {
-            }
-        }
+        view.isEnabled = show
+        view.isClickable = show
     }
 
     private fun updateButtonOpacity(buttonOpacity: Int) {
@@ -1257,12 +1248,12 @@ class PointerService : Service() {
     private fun updateFloatingButtonState(
         enabled: Boolean,
         currentView: ImageButton?,
-        currentLp: WindowManager.LayoutParams?,
+        currentLp: FrameLayout.LayoutParams?,
         key: String,
         icon: Int,
         bgColor: Int,
         action: () -> Unit,
-        wm: WindowManager,
+        container: FrameLayout,
         ctx: Context,
         metrics: android.util.DisplayMetrics,
         allowTapWhenDragEnabled: Boolean = false,
@@ -1288,8 +1279,9 @@ class PointerService : Service() {
                 "nav_right_click" -> 10
                 else -> 0
             }
-            val lp = createButtonLayoutParams(
+            val lp = createOverlayLayoutParams(
                 key,
+                sizePx,
                 sizePx,
                 baseX + indexOffset * (sizePx + gapPx),
                 baseY
@@ -1301,15 +1293,15 @@ class PointerService : Service() {
                     key,
                     { lp },
                     { updated ->
-                        lp.x = updated.x
-                        lp.y = updated.y
-                        wm.updateViewLayout(view, lp)
+                        lp.leftMargin = updated.leftMargin
+                        lp.topMargin = updated.topMargin
+                        view.layoutParams = lp
                     },
                     allowTapWhenDragEnabled = allowTapWhenDragEnabled
                 )
             )
             onLongPress?.let { view.setOnLongClickListener { it() } }
-            wm.addView(view, lp)
+            container.addView(view, lp)
 
             when (key) {
                 "nav_back" -> { backView = view; backLp = lp }
@@ -1326,25 +1318,25 @@ class PointerService : Service() {
             }
         } else {
             when (key) {
-                "nav_back" -> { removeFloatingButton(wm, currentView); backView = null; backLp = null }
-                "nav_home" -> { removeFloatingButton(wm, currentView); homeView = null; homeLp = null }
-                "nav_recents" -> { removeFloatingButton(wm, currentView); recentsView = null; recentsLp = null }
-                "nav_close" -> { removeFloatingButton(wm, currentView); closeView = null; closeLp = null }
-                "nav_drag" -> { removeFloatingButton(wm, currentView); dragToggleView = null; dragToggleLp = null }
-                "nav_toggle" -> { removeFloatingButton(wm, currentView); navToggleView = null; navToggleLp = null }
-                "nav_hide" -> { removeFloatingButton(wm, currentView); hideToggleView = null; hideToggleLp = null }
-                "nav_swap" -> { removeFloatingButton(wm, currentView); swapView = null; swapLp = null }
-                "nav_mirror" -> { removeFloatingButton(wm, currentView); mirrorToggleView = null; mirrorToggleLp = null }
-                "nav_click" -> { removeFloatingButton(wm, currentView); clickView = null; clickLp = null }
-                "nav_right_click" -> { removeFloatingButton(wm, currentView); rightClickView = null; rightClickLp = null }
+                "nav_back" -> { removeFloatingButton(container, currentView); backView = null; backLp = null }
+                "nav_home" -> { removeFloatingButton(container, currentView); homeView = null; homeLp = null }
+                "nav_recents" -> { removeFloatingButton(container, currentView); recentsView = null; recentsLp = null }
+                "nav_close" -> { removeFloatingButton(container, currentView); closeView = null; closeLp = null }
+                "nav_drag" -> { removeFloatingButton(container, currentView); dragToggleView = null; dragToggleLp = null }
+                "nav_toggle" -> { removeFloatingButton(container, currentView); navToggleView = null; navToggleLp = null }
+                "nav_hide" -> { removeFloatingButton(container, currentView); hideToggleView = null; hideToggleLp = null }
+                "nav_swap" -> { removeFloatingButton(container, currentView); swapView = null; swapLp = null }
+                "nav_mirror" -> { removeFloatingButton(container, currentView); mirrorToggleView = null; mirrorToggleLp = null }
+                "nav_click" -> { removeFloatingButton(container, currentView); clickView = null; clickLp = null }
+                "nav_right_click" -> { removeFloatingButton(container, currentView); rightClickView = null; rightClickLp = null }
             }
         }
     }
 
-    private fun removeFloatingButton(wm: WindowManager, view: View?) {
+    private fun removeFloatingButton(container: FrameLayout, view: View?) {
         if (view == null) return
         try {
-            wm.removeView(view)
+            container.removeView(view)
         } catch (_: Throwable) {
         }
     }
@@ -1392,8 +1384,8 @@ class PointerService : Service() {
 
     private inner class FloatingButtonDragTouchListener(
         private val key: String,
-        private val getLp: () -> WindowManager.LayoutParams?,
-        private val update: (WindowManager.LayoutParams) -> Unit,
+        private val getLp: () -> FrameLayout.LayoutParams?,
+        private val update: (FrameLayout.LayoutParams) -> Unit,
         private val allowTapWhenDragEnabled: Boolean = false
     ) : View.OnTouchListener {
         private var lastX = 0f
@@ -1428,10 +1420,10 @@ class PointerService : Service() {
                     if (moved) {
                         val (maxX, maxY) = getDragBounds(v, lp)
                         android.util.Log.d("PointerService","floating button bound: $maxX $maxY")
-                        val newX = (lp.x + dx).toInt().coerceIn(0, maxX.coerceAtLeast(0))
-                        val newY = (lp.y + dy).toInt().coerceIn(0, maxY.coerceAtLeast(0))
-                        lp.x = newX
-                        lp.y = newY
+                        val newX = (lp.leftMargin + dx).toInt().coerceIn(0, maxX.coerceAtLeast(0))
+                        val newY = (lp.topMargin + dy).toInt().coerceIn(0, maxY.coerceAtLeast(0))
+                        lp.leftMargin = newX
+                        lp.topMargin = newY
                         update(lp)
                     }
                     return true
@@ -1443,7 +1435,7 @@ class PointerService : Service() {
                         return true
                     }
                     if (moved) {
-                        savePosition(key, lp.x, lp.y)
+                        savePosition(key, lp.leftMargin, lp.topMargin)
                     }
                     return true
                 }
@@ -1456,8 +1448,8 @@ class PointerService : Service() {
         private val key: String,
         private val sizeKey: String,
         private val resizeCorners: Set<ResizeCorner>,
-        private val getLp: () -> WindowManager.LayoutParams?,
-        private val update: (WindowManager.LayoutParams) -> Unit
+        private val getLp: () -> FrameLayout.LayoutParams?,
+        private val update: (FrameLayout.LayoutParams) -> Unit
     ) : View.OnTouchListener {
         private var lastX = 0f
         private var lastY = 0f
@@ -1511,8 +1503,8 @@ class PointerService : Service() {
                     resizing = activeCorner != null
                     startRawX = e.rawX
                     startRawY = e.rawY
-                    startX = lp.x
-                    startY = lp.y
+                    startX = lp.leftMargin
+                    startY = lp.topMargin
                     startW = lp.width
                     startH = lp.height
                     return true
@@ -1563,8 +1555,8 @@ class PointerService : Service() {
                                 }
                                 null -> {}
                             }
-                            lp.x = newLeft
-                            lp.y = newTop
+                            lp.leftMargin = newLeft
+                            lp.topMargin = newTop
                             lp.width = (newRight - newLeft).coerceAtLeast(minSizePx)
                             lp.height = (newBottom - newTop).coerceAtLeast(minSizePx)
                             update(lp)
@@ -1583,17 +1575,17 @@ class PointerService : Service() {
 
                     if (moved) {
                         val (maxX, maxY) = getDragBounds(v, lp)
-                        val rawX = (lp.x + dx).toInt()
-                        val rawY = (lp.y + dy).toInt()
-                        lp.x = rawX.coerceIn(0, maxX.coerceAtLeast(0))
-                        lp.y = rawY.coerceIn(0, maxY.coerceAtLeast(0))
+                        val rawX = (lp.leftMargin + dx).toInt()
+                        val rawY = (lp.topMargin + dy).toInt()
+                        lp.leftMargin = rawX.coerceIn(0, maxX.coerceAtLeast(0))
+                        lp.topMargin = rawY.coerceIn(0, maxY.coerceAtLeast(0))
                         update(lp)
                     }
                     return true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     if (moved) {
-                        savePosition(key, lp.x, lp.y)
+                        savePosition(key, lp.leftMargin, lp.topMargin)
                         if (resizing) {
                             saveTrackpadSize(sizeKey, lp.width, lp.height)
                         }
@@ -1617,25 +1609,18 @@ class PointerService : Service() {
     private fun dp(metrics: android.util.DisplayMetrics, dp: Int): Int =
         (dp * metrics.density).roundToInt()
 
-    private fun createButtonLayoutParams(
+    private fun createOverlayLayoutParams(
         key: String,
-        sizePx: Int,
+        widthPx: Int,
+        heightPx: Int,
         defaultX: Int,
         defaultY: Int
-    ): WindowManager.LayoutParams {
+    ): FrameLayout.LayoutParams {
         val (x, y) = loadPosition(key, defaultX, defaultY)
-        return WindowManager.LayoutParams(
-            sizePx,
-            sizePx,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
+        return FrameLayout.LayoutParams(widthPx, heightPx).apply {
             gravity = Gravity.TOP or Gravity.START
-            this.x = x
-            this.y = y
+            leftMargin = x
+            topMargin = y
         }
     }
 
@@ -1767,71 +1752,60 @@ class PointerService : Service() {
     }
 
     private fun updateClickThrough() {
-        val wm = padWm ?: return
-        updateClickThroughFor(wm, padViewA, padLpA, clickThroughEnabled)
-        updateClickThroughFor(wm, padViewB, padLpB, clickThroughEnabled)
-        updateClickThroughFor(wm, backView, backLp, clickThroughEnabled)
-        updateClickThroughFor(wm, homeView, homeLp, clickThroughEnabled)
-        updateClickThroughFor(wm, recentsView, recentsLp, clickThroughEnabled)
-        updateClickThroughFor(wm, closeView, closeLp, clickThroughEnabled)
-        updateClickThroughFor(wm, dragToggleView, dragToggleLp, clickThroughEnabled)
-        updateClickThroughFor(wm, navToggleView, navToggleLp, clickThroughEnabled)
-        updateClickThroughFor(wm, swapView, swapLp, clickThroughEnabled)
-        updateClickThroughFor(wm, mirrorToggleView, mirrorToggleLp, clickThroughEnabled)
-        updateClickThroughFor(wm, clickView, clickLp, clickThroughEnabled)
-        updateClickThroughFor(wm, rightClickView, rightClickLp, clickThroughEnabled)
+        updateClickThroughFor(padViewA, clickThroughEnabled)
+        updateClickThroughFor(padViewB, clickThroughEnabled)
+        updateClickThroughFor(backView, clickThroughEnabled)
+        updateClickThroughFor(homeView, clickThroughEnabled)
+        updateClickThroughFor(recentsView, clickThroughEnabled)
+        updateClickThroughFor(closeView, clickThroughEnabled)
+        updateClickThroughFor(dragToggleView, clickThroughEnabled)
+        updateClickThroughFor(navToggleView, clickThroughEnabled)
+        updateClickThroughFor(swapView, clickThroughEnabled)
+        updateClickThroughFor(mirrorToggleView, clickThroughEnabled)
+        updateClickThroughFor(clickView, clickThroughEnabled)
+        updateClickThroughFor(rightClickView, clickThroughEnabled)
         // Keep hideToggleView clickable so it can be turned back on.
     }
 
     private fun updateClickThroughFor(
-        wm: WindowManager,
         view: View?,
-        lp: WindowManager.LayoutParams?,
         enable: Boolean
     ) {
-        if (view == null || lp == null) return
-        val newFlags = if (enable) {
-            lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-        } else {
-            lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-        }
-        if (newFlags == lp.flags) return
-        lp.flags = newFlags
-        try {
-            wm.updateViewLayout(view, lp)
-        } catch (_: Throwable) {
-        }
+        if (view == null) return
+        view.isEnabled = !enable
+        view.isClickable = !enable
+        view.isFocusable = !enable
     }
 
     private fun bringFloatingButtonsToFront() {
-        val wm = padWm ?: return
-        readdFloatingButton(wm, backView, backLp)
-        readdFloatingButton(wm, homeView, homeLp)
-        readdFloatingButton(wm, recentsView, recentsLp)
-        readdFloatingButton(wm, closeView, closeLp)
-        readdFloatingButton(wm, dragToggleView, dragToggleLp)
-        readdFloatingButton(wm, navToggleView, navToggleLp)
-        readdFloatingButton(wm, hideToggleView, hideToggleLp)
-        readdFloatingButton(wm, swapView, swapLp)
-        readdFloatingButton(wm, mirrorToggleView, mirrorToggleLp)
-        readdFloatingButton(wm, clickView, clickLp)
-        readdFloatingButton(wm, rightClickView, rightClickLp)
+        val container = padOverlayView ?: return
+        readdFloatingButton(backView, backLp, container)
+        readdFloatingButton(homeView, homeLp, container)
+        readdFloatingButton(recentsView, recentsLp, container)
+        readdFloatingButton(closeView, closeLp, container)
+        readdFloatingButton(dragToggleView, dragToggleLp, container)
+        readdFloatingButton(navToggleView, navToggleLp, container)
+        readdFloatingButton(hideToggleView, hideToggleLp, container)
+        readdFloatingButton(swapView, swapLp, container)
+        readdFloatingButton(mirrorToggleView, mirrorToggleLp, container)
+        readdFloatingButton(clickView, clickLp, container)
+        readdFloatingButton(rightClickView, rightClickLp, container)
     }
 
     private fun readdFloatingButton(
-        wm: WindowManager,
         view: View?,
-        lp: WindowManager.LayoutParams?
+        lp: FrameLayout.LayoutParams?,
+        container: FrameLayout
     ) {
         if (view == null || lp == null) return
         try {
             if (view.parent != null) {
-                wm.removeView(view)
+                container.removeView(view)
             }
         } catch (_: Throwable) {
         }
         try {
-            wm.addView(view, lp)
+            container.addView(view, lp)
         } catch (_: Throwable) {
         }
     }
@@ -1841,7 +1815,7 @@ class PointerService : Service() {
         hideToggleView?.setImageResource(icon)
     }
 
-    private fun getDragBounds(v: View, lp: WindowManager.LayoutParams): Pair<Int, Int> {
+    private fun getDragBounds(v: View, lp: ViewGroup.MarginLayoutParams): Pair<Int, Int> {
         val display = v.display
         val metrics = android.util.DisplayMetrics()
         if (display != null) {
@@ -1870,18 +1844,16 @@ class PointerService : Service() {
     }
 
     private fun applyTrackpadSizes(
-        wm: WindowManager,
         metrics: android.util.DisplayMetrics
     ) {
-        updateTrackpadSize(padViewA, padLpA, "trackpad_right", wm, metrics)
-        updateTrackpadSize(padViewB, padLpB, "trackpad_left", wm, metrics)
+        updateTrackpadSize(padViewA, padLpA, "trackpad_right", metrics)
+        updateTrackpadSize(padViewB, padLpB, "trackpad_left", metrics)
     }
 
     private fun updateTrackpadSize(
         view: View?,
-        lp: WindowManager.LayoutParams?,
+        lp: FrameLayout.LayoutParams?,
         sizeKey: String,
-        wm: WindowManager,
         metrics: android.util.DisplayMetrics
     ) {
         if (view == null || lp == null) return
@@ -1895,11 +1867,8 @@ class PointerService : Service() {
         if (lp.width != coercedW || lp.height != coercedH) {
             lp.width = coercedW
             lp.height = coercedH
-            try {
-                wm.updateViewLayout(view, lp)
-                applyOverlayPositions()
-            } catch (_: Throwable) {
-            }
+            view.layoutParams = lp
+            applyOverlayPositions()
         }
     }
 
@@ -2045,7 +2014,7 @@ class PointerService : Service() {
 
     private fun showNavButtonCluster(
         ctx: Context,
-        wm: WindowManager,
+        container: FrameLayout,
         sizePx: Int,
         gapPx: Int,
         baseX: Int,
@@ -2062,7 +2031,7 @@ class PointerService : Service() {
 
         var slot = 0
         if (showBack) {
-            backLp = createButtonLayoutParams("nav_back", sizePx, baseX + slot * (sizePx + gapPx), baseY)
+            backLp = createOverlayLayoutParams("nav_back", sizePx, sizePx, baseX + slot * (sizePx + gapPx), baseY)
             backView = createFloatingButton(ctx, R.drawable.ic_back, sizePx, defaultColor) {
                 PointerAccessibilityService.instance
                     ?.performGlobalAction(GLOBAL_ACTION_BACK)
@@ -2070,14 +2039,14 @@ class PointerService : Service() {
             backView?.setOnTouchListener(
                 FloatingButtonDragTouchListener("nav_back", { backLp }, { lp ->
                     backLp = lp
-                    wm.updateViewLayout(backView, lp)
+                    backView?.layoutParams = lp
                 })
             )
-            wm.addView(backView, backLp)
+            container.addView(backView, backLp)
             slot++
         }
         if (showHome) {
-            homeLp = createButtonLayoutParams("nav_home", sizePx, baseX + slot * (sizePx + gapPx), baseY)
+            homeLp = createOverlayLayoutParams("nav_home", sizePx, sizePx, baseX + slot * (sizePx + gapPx), baseY)
             homeView = createFloatingButton(ctx, R.drawable.ic_home, sizePx, defaultColor) {
                 PointerAccessibilityService.instance
                     ?.performGlobalAction(GLOBAL_ACTION_HOME)
@@ -2085,14 +2054,14 @@ class PointerService : Service() {
             homeView?.setOnTouchListener(
                 FloatingButtonDragTouchListener("nav_home", { homeLp }, { lp ->
                     homeLp = lp
-                    wm.updateViewLayout(homeView, lp)
+                    homeView?.layoutParams = lp
                 })
             )
-            wm.addView(homeView, homeLp)
+            container.addView(homeView, homeLp)
             slot++
         }
         if (showRecents) {
-            recentsLp = createButtonLayoutParams("nav_recents", sizePx, baseX + slot * (sizePx + gapPx), baseY)
+            recentsLp = createOverlayLayoutParams("nav_recents", sizePx, sizePx, baseX + slot * (sizePx + gapPx), baseY)
             recentsView = createFloatingButton(ctx, R.drawable.ic_menu, sizePx, defaultColor) {
                 PointerAccessibilityService.instance
                     ?.performGlobalAction(GLOBAL_ACTION_RECENTS)
@@ -2100,14 +2069,14 @@ class PointerService : Service() {
             recentsView?.setOnTouchListener(
                 FloatingButtonDragTouchListener("nav_recents", { recentsLp }, { lp ->
                     recentsLp = lp
-                    wm.updateViewLayout(recentsView, lp)
+                    recentsView?.layoutParams = lp
                 })
             )
-            wm.addView(recentsView, recentsLp)
+            container.addView(recentsView, recentsLp)
             slot++
         }
         if (showStop) {
-            closeLp = createButtonLayoutParams("nav_close", sizePx, baseX + slot * (sizePx + gapPx), baseY)
+            closeLp = createOverlayLayoutParams("nav_close", sizePx, sizePx, baseX + slot * (sizePx + gapPx), baseY)
             closeView = createFloatingButton(ctx, android.R.drawable.ic_menu_close_clear_cancel, sizePx, closeColor) {
                 // Close only the trackpad overlay, keep cursor/service alive
                 detachTrackpad()
@@ -2119,20 +2088,20 @@ class PointerService : Service() {
             closeView?.setOnTouchListener(
                 FloatingButtonDragTouchListener("nav_close", { closeLp }, { lp ->
                     closeLp = lp
-                    wm.updateViewLayout(closeView, lp)
+                    closeView?.layoutParams = lp
                 })
             )
-            wm.addView(closeView, closeLp)
+            container.addView(closeView, closeLp)
         }
 
         updateClickThrough()
     }
 
-    private fun hideNavButtonCluster(wm: WindowManager) {
-        try { if (backView != null) wm.removeView(backView) } catch (_: Throwable) {}
-        try { if (homeView != null) wm.removeView(homeView) } catch (_: Throwable) {}
-        try { if (recentsView != null) wm.removeView(recentsView) } catch (_: Throwable) {}
-        try { if (closeView != null) wm.removeView(closeView) } catch (_: Throwable) {}
+    private fun hideNavButtonCluster(container: FrameLayout) {
+        try { if (backView != null) container.removeView(backView) } catch (_: Throwable) {}
+        try { if (homeView != null) container.removeView(homeView) } catch (_: Throwable) {}
+        try { if (recentsView != null) container.removeView(recentsView) } catch (_: Throwable) {}
+        try { if (closeView != null) container.removeView(closeView) } catch (_: Throwable) {}
         backView = null
         homeView = null
         recentsView = null
