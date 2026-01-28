@@ -10,6 +10,9 @@ AYN Thor Bottom Screen Power Tool (TrackPadDS) is an Android overlay app that tu
   - Screen mirror mode: mirrors the primary screen to the bottom screen and forwards touch input.
 - Overlay elements are togglable, rearrangeable, resizable, and support configurable opacity.
 
+## Demo and guide video
+[![Watch the video](https://img.youtube.com/vi/uenUs3RbZ7M/0.jpg)](https://www.youtube.com/watch?v=uenUs3RbZ7M)
+
 ## How to use
 ### Trackpad and action buttons
 
