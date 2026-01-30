@@ -1880,6 +1880,8 @@ class PointerService : Service() {
         navToggleView?.visibility = if (hide) View.GONE else View.VISIBLE
         dragToggleView?.isEnabled = !hide
         navToggleView?.isEnabled = !hide
+        closeView?.isEnabled = !hide
+        closeView?.isClickable = !hide
     }
 
     private fun toggleClickThrough() {
