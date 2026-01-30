@@ -14,6 +14,7 @@
     "trackpad_right_height": 461,
     "auto_focus_primary_on_touch": false,
     "show_hide_btn": true,
+    "show_light_btn": true,
     "haptic_mirror_buttons": true,
     "mirror_show_toggle": true,
     "show_back_btn": true,
@@ -30,7 +31,9 @@
     "show_recents_btn": true,
     "show_home_btn": true,
     "mirror_show_home": false,
-    "trackpad_click_multitouch": true
+    "trackpad_click_multitouch": true,
+    "light_overlay_enabled": false,
+    "light_off_keep_controls": false
   },
   "floating_positions": {
     "pad_a_y": 619,
@@ -44,8 +47,8 @@
     "nav_home_y": 978,
     "nav_close_x": 1139,
     "nav_close_y": 0,
-    "nav_toggle_x": 1135,
-    "nav_toggle_y": 117,
+    "nav_toggle_x": 1139,
+    "nav_toggle_y": 506,
     "nav_mirror_y": 4,
     "nav_click_y": 615,
     "nav_drag_x": 1134,
@@ -58,7 +61,9 @@
     "nav_recents_y": 979,
     "nav_recents_x": 0,
     "nav_hide_x": 1134,
-    "nav_hide_y": 974
+    "nav_hide_y": 974,
+    "nav_light_x": 1139,
+    "nav_light_y": 112
   },
   "mirror_positions": {
     "mirror_drag_x": 1139,

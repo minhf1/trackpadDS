@@ -319,6 +319,7 @@ class MainActivity : ComponentActivity() {
             Triple("show_stop_btn", "Stop overlay button", android.R.drawable.ic_menu_close_clear_cancel),
             Triple("show_hide_btn", "Show/Hide toggle button", R.drawable.ic_eye_open),
             Triple("show_swap_btn", "Screen swap button - Experimental use at your own risk to be fixed in future", R.drawable.ic_swap),
+            Triple("show_light_btn", "Light overlay toggle button", R.drawable.ic_light_bulb),
             Triple("show_mirror_btn", "Mirror mode toggle button", R.drawable.ic_mirror),
             Triple("show_click_btn", "Click button", R.drawable.ic_trackpad_click),
             Triple("show_right_click_btn", "Right-click button", R.drawable.ic_trackpad_right_click),
@@ -597,6 +598,28 @@ class MainActivity : ComponentActivity() {
             prefs = prefs
         ))
 
+        val lightOffHeader = buildSubgroupHeaderRow(
+            title = "Light Off Mode",
+            subtitle = "Behavior when the light overlay is enabled",
+            icon = R.drawable.ic_light_bulb,
+            flipIcon = false
+        )
+        val lightOffOptions = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = LinearLayout.GONE
+            setPadding(0, 6, 0, 0)
+        }
+        lightOffHeader.setOnClickListener {
+            lightOffOptions.visibility =
+                if (lightOffOptions.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
+        }
+        lightOffOptions.addView(buildToggleRow(
+            label = "Keep controller element ON when Light Off",
+            key = "light_off_keep_controls",
+            icon = R.drawable.ic_light_bulb,
+            prefs = prefs
+        ))
+
         val hapticHeader = buildSubgroupHeaderRow(
             title = "Trackpad haptic feedback",
             subtitle = "Trackpad and overlay vibration controls",
@@ -664,6 +687,9 @@ class MainActivity : ComponentActivity() {
         options.addView(space(8))
         options.addView(trackpadModeHeader)
         options.addView(trackpadModeOptions)
+        options.addView(space(8))
+        options.addView(lightOffHeader)
+        options.addView(lightOffOptions)
         options.addView(space(8))
         options.addView(hapticHeader)
         options.addView(hapticOptions)

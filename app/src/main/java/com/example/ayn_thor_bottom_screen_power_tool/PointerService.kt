@@ -65,6 +65,7 @@ class PointerService : Service() {
     private var navToggleView: ImageButton? = null
     private var hideToggleView: ImageButton? = null
     private var swapView: ImageButton? = null
+    private var lightToggleView: ImageButton? = null
     private var mirrorToggleView: ImageButton? = null
     private var clickView: ImageButton? = null
     private var rightClickView: ImageButton? = null
@@ -76,6 +77,7 @@ class PointerService : Service() {
     private var navToggleLp: WindowManager.LayoutParams? = null
     private var hideToggleLp: WindowManager.LayoutParams? = null
     private var swapLp: WindowManager.LayoutParams? = null
+    private var lightToggleLp: WindowManager.LayoutParams? = null
     private var mirrorToggleLp: WindowManager.LayoutParams? = null
     private var clickLp: WindowManager.LayoutParams? = null
     private var rightClickLp: WindowManager.LayoutParams? = null
@@ -83,6 +85,8 @@ class PointerService : Service() {
     private var showNavButtons = true
     private var hideOverlays = false
     private var clickThroughEnabled = false
+    private var lightOverlayEnabled = false
+    private var lightOffKeepControls = false
     private var activityTaskService: Any? = null
     private val uiPrefs by lazy {
         getSharedPreferences("ui_config", Context.MODE_PRIVATE)
@@ -120,6 +124,8 @@ class PointerService : Service() {
     private val mirrorTouchHide = Runnable { hideMirrorTouch() }
     private var mirrorClickView: View? = null
     private var mirrorClickLp: WindowManager.LayoutParams? = null
+    private var lightOverlayView: View? = null
+    private var lightOverlayLp: WindowManager.LayoutParams? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -300,6 +306,7 @@ class PointerService : Service() {
         padWm = displayCtx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
         val metrics = displayCtx.resources.displayMetrics
+        ensureLightOverlay(displayCtx)
 
         val defaultPadWidth = dp(metrics, 200)
         val defaultPadHeight = dp(metrics, 200)
@@ -586,6 +593,7 @@ class PointerService : Service() {
     private fun detachTrackpad() {
         val wm = padWm
         if (wm != null) {
+            try { if (lightOverlayView != null) wm.removeView(lightOverlayView) } catch (_: Throwable) {}
             try { if (padViewA != null) wm.removeView(padViewA) } catch (_: Throwable) {}
             try { if (padViewB != null) wm.removeView(padViewB) } catch (_: Throwable) {}
             try { if (backView != null) wm.removeView(backView) } catch (_: Throwable) {}
@@ -596,10 +604,13 @@ class PointerService : Service() {
             try { if (navToggleView != null) wm.removeView(navToggleView) } catch (_: Throwable) {}
             try { if (hideToggleView != null) wm.removeView(hideToggleView) } catch (_: Throwable) {}
             try { if (swapView != null) wm.removeView(swapView) } catch (_: Throwable) {}
+            try { if (lightToggleView != null) wm.removeView(lightToggleView) } catch (_: Throwable) {}
             try { if (mirrorToggleView != null) wm.removeView(mirrorToggleView) } catch (_: Throwable) {}
             try { if (clickView != null) wm.removeView(clickView) } catch (_: Throwable) {}
             try { if (rightClickView != null) wm.removeView(rightClickView) } catch (_: Throwable) {}
         }
+        lightOverlayView = null
+        lightOverlayLp = null
         padViewA = null
         padViewB = null
         padLpA = null
@@ -619,6 +630,7 @@ class PointerService : Service() {
         navToggleView = null
         hideToggleView = null
         swapView = null
+        lightToggleView = null
         mirrorToggleView = null
         clickView = null
         rightClickView = null
@@ -630,6 +642,7 @@ class PointerService : Service() {
         navToggleLp = null
         hideToggleLp = null
         swapLp = null
+        lightToggleLp = null
         mirrorToggleLp = null
         clickLp = null
         rightClickLp = null
@@ -948,6 +961,7 @@ class PointerService : Service() {
         val wantHide = uiPrefs.getBoolean("show_hide_btn", true)
         val wantSwap = uiPrefs.getBoolean("show_swap_btn", true)
         val wantNavToggle = navToggleVisible
+        val wantLight = uiPrefs.getBoolean("show_light_btn", true)
         val wantMirror = uiPrefs.getBoolean("show_mirror_btn", true)
         val wantClick = uiPrefs.getBoolean("show_click_btn", true)
         val wantRightClick = uiPrefs.getBoolean("show_right_click_btn", true)
@@ -955,6 +969,8 @@ class PointerService : Service() {
         val showPadRight = uiPrefs.getBoolean("show_trackpad_right", true)
         buttonOpacity = uiPrefs.getInt("button_opacity", 100).coerceIn(0, 100)
         trackpadOpacity = uiPrefs.getInt("trackpad_opacity", 100).coerceIn(0, 100)
+        lightOverlayEnabled = uiPrefs.getBoolean("light_overlay_enabled", false)
+        lightOffKeepControls = uiPrefs.getBoolean("light_off_keep_controls", false)
 
         android.util.Log.d("PointerService", "buttonOpacity $buttonOpacity")
 
@@ -1088,6 +1104,21 @@ class PointerService : Service() {
             metrics
         )
         updateFloatingButtonState(
+            wantLight,
+            lightToggleView,
+            lightToggleLp,
+            "nav_light",
+            R.drawable.ic_light_bulb,
+            Color.argb(buttonOpacity * 255 / 100, 60, 60, 60),
+            {
+                toggleLightOverlay()
+            },
+            wm,
+            ctx,
+            metrics
+        )
+        updateOverlayPosition("nav_light", lightToggleView, lightToggleLp, wm)
+        updateFloatingButtonState(
             wantMirror,
             mirrorToggleView,
             mirrorToggleLp,
@@ -1154,6 +1185,9 @@ class PointerService : Service() {
         updateClickThrough()
         updateButtonOpacity(buttonOpacity)
         updateTrackpadOpacity(trackpadOpacity)
+        updateLightToggleAppearance()
+        updateLightOverlayVisibility()
+        updateHideOverlaysVisuals()
         applyTrackpadSizes(wm, metrics)
         updateTrackpadHeaderVisibility(!navButtonsEnabled)
         updateTrackpadVisibility(padViewA, padLpA, showPadRight, wm)
@@ -1180,6 +1214,7 @@ class PointerService : Service() {
         updateOverlayPosition("nav_toggle", navToggleView, navToggleLp, wm)
         updateOverlayPosition("nav_hide", hideToggleView, hideToggleLp, wm)
         updateOverlayPosition("nav_swap", swapView, swapLp, wm)
+        updateOverlayPosition("nav_light", lightToggleView, lightToggleLp, wm)
         updateOverlayPosition("nav_mirror", mirrorToggleView, mirrorToggleLp, wm)
         updateOverlayPosition("nav_click", clickView, clickLp, wm)
         updateOverlayPosition("nav_right_click", rightClickView, rightClickLp, wm)
@@ -1286,6 +1321,7 @@ class PointerService : Service() {
                 "nav_mirror" -> 8
                 "nav_click" -> 9
                 "nav_right_click" -> 10
+                 "nav_light" -> 11
                 else -> 0
             }
             val lp = createButtonLayoutParams(
@@ -1320,6 +1356,7 @@ class PointerService : Service() {
                 "nav_toggle" -> { navToggleView = view; navToggleLp = lp }
                 "nav_hide" -> { hideToggleView = view; hideToggleLp = lp }
                 "nav_swap" -> { swapView = view; swapLp = lp }
+                "nav_light" -> { lightToggleView = view; lightToggleLp = lp }
                 "nav_mirror" -> { mirrorToggleView = view; mirrorToggleLp = lp }
                 "nav_click" -> { clickView = view; clickLp = lp }
                 "nav_right_click" -> { rightClickView = view; rightClickLp = lp }
@@ -1334,6 +1371,7 @@ class PointerService : Service() {
                 "nav_toggle" -> { removeFloatingButton(wm, currentView); navToggleView = null; navToggleLp = null }
                 "nav_hide" -> { removeFloatingButton(wm, currentView); hideToggleView = null; hideToggleLp = null }
                 "nav_swap" -> { removeFloatingButton(wm, currentView); swapView = null; swapLp = null }
+                "nav_light" -> { removeFloatingButton(wm, currentView); lightToggleView = null; lightToggleLp = null }
                 "nav_mirror" -> { removeFloatingButton(wm, currentView); mirrorToggleView = null; mirrorToggleLp = null }
                 "nav_click" -> { removeFloatingButton(wm, currentView); clickView = null; clickLp = null }
                 "nav_right_click" -> { removeFloatingButton(wm, currentView); rightClickView = null; rightClickLp = null }
@@ -1650,6 +1688,10 @@ class PointerService : Service() {
     }
 
     private fun updateDragModeVisuals() {
+        if (shouldHideControlsForLightOff()) {
+            applyHideOverlaysVisuals(true, lightToggleView)
+            return
+        }
         if (hideOverlays) return
         val baseButtonAlpha = (buttonOpacity.coerceIn(0, 100) * 255 / 100)
         val basePadAlpha = (trackpadOpacity.coerceIn(0, 100) * 255 / 100)
@@ -1702,6 +1744,47 @@ class PointerService : Service() {
         updateHideOverlaysVisuals()
     }
 
+    private fun toggleLightOverlay() {
+        lightOverlayEnabled = !lightOverlayEnabled
+        uiPrefs.edit().putBoolean("light_overlay_enabled", lightOverlayEnabled).apply()
+        updateLightToggleAppearance()
+        updateLightOverlayVisibility()
+        // Light Off Mode hide-controls logic removed here for later rework.
+        updateHideOverlaysVisuals()
+    }
+
+    private fun ensureLightOverlay(ctx: Context) {
+        if (lightOverlayView != null) return
+        lightOverlayView = View(ctx).apply {
+            setBackgroundColor(Color.argb(255, 0, 0, 0))
+            alpha = 1f
+            visibility = View.GONE
+        }
+        lightOverlayLp = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = 0
+        }
+        padWm?.addView(lightOverlayView, lightOverlayLp)
+    }
+
+    private fun updateLightOverlayVisibility() {
+        val view = lightOverlayView ?: return
+        val shouldShow = lightOverlayEnabled
+        view.visibility = if (shouldShow) View.VISIBLE else View.GONE
+        view.alpha = if (shouldShow) 1f else 0f
+    }
+
+    // Light Off Mode control-visibility logic removed for later redesign.
+
     private fun stopOverlayAndSelf() {
         uiPrefs.edit().putBoolean("overlay_running", false).apply()
         detachTrackpad()
@@ -1712,37 +1795,58 @@ class PointerService : Service() {
     }
 
     private fun updateHideOverlaysVisuals() {
+        if (shouldHideControlsForLightOff()) {
+            applyHideOverlaysVisuals(true, lightToggleView)
+            return
+        }
+        applyHideOverlaysVisuals(hideOverlays, hideToggleView)
+        updateHideToggleIcon()
+    }
+
+    private fun applyHideOverlaysVisuals(hide: Boolean, keepVisible: View?) {
         val baseButtonAlpha = (buttonOpacity.coerceIn(0, 100) * 255 / 100)
         val basePadAlpha = (trackpadOpacity.coerceIn(0, 100) / 100f)
-        val buttonAlpha = if (hideOverlays) 0 else baseButtonAlpha
-        val closeAlpha = if (hideOverlays) 0 else baseButtonAlpha
-        val cardAlpha = if (hideOverlays) 0f else basePadAlpha
-        val padAlpha = if (hideOverlays) 0f else basePadAlpha
+        val buttonAlpha = if (hide) 0 else baseButtonAlpha
+        val closeAlpha = if (hide) 0 else baseButtonAlpha
+        val cardAlpha = if (hide) 0f else basePadAlpha
+        val padAlpha = if (hide) 0f else basePadAlpha
 
         for (view in floatingButtons) {
-            if (view === hideToggleView) continue
+            if (view === keepVisible) {
+                val bg = view.background as? GradientDrawable
+                bg?.alpha = baseButtonAlpha
+                if (view is ImageButton) {
+                    view.imageAlpha = baseButtonAlpha
+                }
+                view.alpha = 1f
+                view.visibility = View.VISIBLE
+                continue
+            }
             val bg = view.background as? GradientDrawable ?: continue
             val useAlpha = if (view === closeView) closeAlpha else buttonAlpha
             bg.alpha = useAlpha
             if (view is ImageButton) {
                 view.imageAlpha = useAlpha
             }
-            view.alpha = if (hideOverlays) 0f else 1f
+            view.alpha = if (hide) 0f else 1f
+            view.visibility = View.VISIBLE
         }
 
         for (card in trackpadCards) {
             val bg = card.background as? GradientDrawable ?: continue
             bg.alpha = (cardAlpha * 255).toInt().coerceIn(0, 255)
             card.alpha = cardAlpha
+            card.visibility = View.VISIBLE
         }
 
         for (pad in trackpadSurfaces) {
             val bg = pad.background as? GradientDrawable ?: continue
             bg.alpha = (padAlpha * 255).toInt().coerceIn(0, 255)
             pad.alpha = padAlpha
+            pad.visibility = View.VISIBLE
         }
 
-        val handleVisible = !hideOverlays && dragModeEnabled
+        val handleVisible = !hide && dragModeEnabled
         for (handle in trackpadResizeHandles) {
             handle.visibility = if (handleVisible) View.VISIBLE else View.GONE
             handle.alpha = if (handleVisible) 1f else 0f
@@ -1752,13 +1856,16 @@ class PointerService : Service() {
             label.alpha = if (handleVisible) 1f else 0f
         }
 
-        dragToggleView?.visibility = if (hideOverlays) View.GONE else View.VISIBLE
-        navToggleView?.visibility = if (hideOverlays) View.GONE else View.VISIBLE
-        dragToggleView?.isEnabled = !hideOverlays
-        navToggleView?.isEnabled = !hideOverlays
+        val headerVisible = !hide && !showNavButtons
+        for (header in trackpadHeaderRows) {
+            header.visibility = if (headerVisible) View.VISIBLE else View.GONE
+            header.alpha = if (headerVisible) 1f else 0f
+        }
 
-        updateHideToggleIcon()
-        updateTrackpadHeaderVisibility(!showNavButtons)
+        dragToggleView?.visibility = if (hide) View.GONE else View.VISIBLE
+        navToggleView?.visibility = if (hide) View.GONE else View.VISIBLE
+        dragToggleView?.isEnabled = !hide
+        navToggleView?.isEnabled = !hide
     }
 
     private fun toggleClickThrough() {
@@ -1777,6 +1884,7 @@ class PointerService : Service() {
         updateClickThroughFor(wm, dragToggleView, dragToggleLp, clickThroughEnabled)
         updateClickThroughFor(wm, navToggleView, navToggleLp, clickThroughEnabled)
         updateClickThroughFor(wm, swapView, swapLp, clickThroughEnabled)
+        updateClickThroughFor(wm, lightToggleView, lightToggleLp, clickThroughEnabled)
         updateClickThroughFor(wm, mirrorToggleView, mirrorToggleLp, clickThroughEnabled)
         updateClickThroughFor(wm, clickView, clickLp, clickThroughEnabled)
         updateClickThroughFor(wm, rightClickView, rightClickLp, clickThroughEnabled)
@@ -1813,6 +1921,7 @@ class PointerService : Service() {
         readdFloatingButton(wm, navToggleView, navToggleLp)
         readdFloatingButton(wm, hideToggleView, hideToggleLp)
         readdFloatingButton(wm, swapView, swapLp)
+        readdFloatingButton(wm, lightToggleView, lightToggleLp)
         readdFloatingButton(wm, mirrorToggleView, mirrorToggleLp)
         readdFloatingButton(wm, clickView, clickLp)
         readdFloatingButton(wm, rightClickView, rightClickLp)
@@ -1839,6 +1948,17 @@ class PointerService : Service() {
     private fun updateHideToggleIcon() {
         val icon = if (hideOverlays) R.drawable.ic_eye_closed else R.drawable.ic_eye_open
         hideToggleView?.setImageResource(icon)
+    }
+
+    private fun updateLightToggleAppearance() {
+        val button = lightToggleView ?: return
+        val bg = button.background as? GradientDrawable ?: return
+        bg.setColor(Color.argb(110, 60, 60, 60))
+        if (lightOverlayEnabled) {
+            button.setImageResource(R.drawable.ic_light_bulb)
+        } else {
+            button.setImageResource(R.drawable.ic_light_bulb_off)
+        }
     }
 
     private fun getDragBounds(v: View, lp: WindowManager.LayoutParams): Pair<Int, Int> {
@@ -2213,5 +2333,9 @@ class PointerService : Service() {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
+    }
+
+    private fun shouldHideControlsForLightOff(): Boolean {
+        return lightOverlayEnabled && !lightOffKeepControls
     }
 }

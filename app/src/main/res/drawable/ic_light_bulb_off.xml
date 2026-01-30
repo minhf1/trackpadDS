@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="256dp"
+    android:height="256dp"
+    android:viewportWidth="256"
+    android:viewportHeight="256">
+
+    <group
+        android:translateX="1.4065934065934016"
+        android:translateY="1.4065934065934016"
+        android:scaleX="2.81"
+        android:scaleY="2.81">
+        <path
+            android:fillColor="#000000"
+            android:strokeWidth="1"
+            android:strokeMiterLimit="10"
+            android:strokeLineCap="round"
+            android:pathData="M 56.08 67.672 H 33.92 c -1.104 0 -2 -0.895 -2 -2 v -0.67 c 0 -4.366 -2.036 -8.481 -5.586 -11.291 l 0 0 c -7.814 -6.184 -12.06 -15.825 -11.357 -25.791 c 1.054 -14.944 13.128 -26.92 28.084 -27.859 c 8.423 -0.532 16.421 2.346 22.542 8.094 C 71.638 13.825 75.1 21.823 75.1 30.1 c 0 9.36 -4.244 18.026 -11.644 23.776 C 60.09 56.492 58.08 60.65 58.08 65 v 0.673 C 58.08 66.777 57.184 67.672 56.08 67.672 z" />
+        <path
+            android:fillColor="#000000"
+            android:strokeWidth="1"
+            android:strokeMiterLimit="10"
+            android:strokeLineCap="round"
+            android:pathData="M 56.08 75.115 H 33.92 c -1.104 0 -2 -0.895 -2 -2 c 0 -1.104 0.895 -2 2 -2 h 22.16 c 1.104 0 2 0.895 2 2 C 58.08 74.219 57.184 75.115 56.08 75.115 z" />
+        <path
+            android:fillColor="#000000"
+            android:strokeWidth="1"
+            android:strokeMiterLimit="10"
+            android:strokeLineCap="round"
+            android:pathData="M 56.08 82.557 H 33.92 c -1.104 0 -2 -0.895 -2 -2 c 0 -1.104 0.895 -2 2 -2 h 22.16 c 1.104 0 2 0.895 2 2 C 58.08 81.661 57.184 82.557 56.08 82.557 z" />
+        <path
+            android:fillColor="#000000"
+            android:strokeWidth="1"
+            android:strokeMiterLimit="10"
+            android:strokeLineCap="round"
+            android:pathData="M 53.382 89.999 H 36.618 c -1.104 0 -2 -0.895 -2 -2 c 0 -1.104 0.895 -2 2 -2 h 16.764 c 1.104 0 2 0.895 2 2 C 55.382 89.104 54.486 89.999 53.382 89.999 z" />
+    </group>
+</vector>
