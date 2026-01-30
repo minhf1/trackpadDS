@@ -619,12 +619,33 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.ic_light_bulb,
             prefs = prefs
         ))
-        lightOffOptions.addView(buildToggleRow(
-            label = "Display light off button on the primary screen while bottom screen is off",
+        var syncPrimaryEnabled: (() -> Unit)? = null
+        val hideBottomRow = buildToggleRow(
+            label = "Hide bottom screen light bulb button when light off",
+            key = "light_off_hide_bottom_button",
+            icon = R.drawable.ic_light_bulb,
+            prefs = prefs,
+            onCheckedChange = { syncPrimaryEnabled?.invoke() }
+        )
+        val showPrimaryRow = buildToggleRow(
+            label = "Show light bulb button on primary screen when light off",
             key = "light_off_primary_button",
             icon = R.drawable.ic_light_bulb,
             prefs = prefs
-        ))
+        )
+        lightOffOptions.addView(hideBottomRow)
+        lightOffOptions.addView(showPrimaryRow)
+        val hideSwitch = hideBottomRow.getChildAt(2) as? Switch
+        val primarySwitch = showPrimaryRow.getChildAt(2) as? Switch
+        syncPrimaryEnabled = {
+            val hideBottom = hideSwitch?.isChecked == true
+            primarySwitch?.isEnabled = hideBottom
+            if (!hideBottom && primarySwitch?.isChecked == true) {
+                primarySwitch.isChecked = false
+                prefs.edit().putBoolean("light_off_primary_button", false).apply()
+            }
+        }
+        syncPrimaryEnabled?.invoke()
 
         val hapticHeader = buildSubgroupHeaderRow(
             title = "Trackpad haptic feedback",
@@ -1081,7 +1102,8 @@ class MainActivity : ComponentActivity() {
         label: String,
         key: String,
         icon: Int,
-        prefs: android.content.SharedPreferences
+        prefs: android.content.SharedPreferences,
+        onCheckedChange: ((Boolean) -> Unit)? = null
     ): LinearLayout {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -1118,11 +1140,14 @@ class MainActivity : ComponentActivity() {
                 val color = if (isChecked) enabledColor else disabledColor
                 thumbTintList = color
                 trackTintList = color
+                onCheckedChange?.invoke(isChecked)
             }
         }
 
         row.setOnClickListener {
-            toggle.isChecked = !toggle.isChecked
+            if (toggle.isEnabled) {
+                toggle.isChecked = !toggle.isChecked
+            }
         }
 
         row.addView(iconView)

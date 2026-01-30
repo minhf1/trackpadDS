@@ -88,6 +88,7 @@ class PointerService : Service() {
     private var lightOverlayEnabled = false
     private var lightOffKeepControls = false
     private var lightOffPrimaryButton = false
+    private var lightOffHideBottomButton = false
     private var activityTaskService: Any? = null
     private val uiPrefs by lazy {
         getSharedPreferences("ui_config", Context.MODE_PRIVATE)
@@ -978,6 +979,11 @@ class PointerService : Service() {
         lightOverlayEnabled = uiPrefs.getBoolean("light_overlay_enabled", false)
         lightOffKeepControls = uiPrefs.getBoolean("light_off_keep_controls", false)
         lightOffPrimaryButton = uiPrefs.getBoolean("light_off_primary_button", false)
+        lightOffHideBottomButton = uiPrefs.getBoolean("light_off_hide_bottom_button", false)
+        if (!lightOffHideBottomButton && lightOffPrimaryButton) {
+            lightOffPrimaryButton = false
+            uiPrefs.edit().putBoolean("light_off_primary_button", false).apply()
+        }
 
         android.util.Log.d("PointerService", "buttonOpacity $buttonOpacity")
 
@@ -2018,8 +2024,9 @@ class PointerService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = dp(metrics, 16)
-            y = dp(metrics, 16)
+            val (savedX, savedY) = loadPosition("light_primary", dp(metrics, 16), dp(metrics, 16))
+            x = savedX
+            y = savedY
         }
         lightPrimaryWm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         updateLightPrimaryButtonAppearance()
@@ -2070,6 +2077,8 @@ class PointerService : Service() {
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     if (!moved) {
                         v.performClick()
+                    } else {
+                        savePosition("light_primary", lp.x, lp.y)
                     }
                     return true
                 }
@@ -2095,7 +2104,7 @@ class PointerService : Service() {
     }
 
     private fun updateLightPrimaryButtonVisibility() {
-        val shouldShow = lightOverlayEnabled && lightOffPrimaryButton
+        val shouldShow = lightOverlayEnabled && lightOffHideBottomButton && lightOffPrimaryButton
         if (!shouldShow) {
             val view = lightPrimaryView
             if (view != null && view.parent != null) {
@@ -2493,6 +2502,6 @@ class PointerService : Service() {
     }
 
     private fun getLightOffKeepVisibleButton(): View? {
-        return if (lightOffPrimaryButton) null else lightToggleView
+        return if (lightOffHideBottomButton) null else lightToggleView
     }
 }

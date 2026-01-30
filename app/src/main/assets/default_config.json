@@ -34,7 +34,8 @@
     "trackpad_click_multitouch": true,
     "light_overlay_enabled": false,
     "light_off_keep_controls": true,
-    "light_off_primary_button": true
+    "light_off_primary_button": true,
+    "light_off_hide_bottom_button": true
   },
   "floating_positions": {
     "pad_a_y": 619,
@@ -64,7 +65,9 @@
     "nav_hide_x": 1134,
     "nav_hide_y": 974,
     "nav_light_x": 1139,
-    "nav_light_y": 112
+    "nav_light_y": 112,
+    "light_primary_x": 1819,
+    "light_primary_y": 979
   },
   "mirror_positions": {
     "mirror_drag_x": 1139,
