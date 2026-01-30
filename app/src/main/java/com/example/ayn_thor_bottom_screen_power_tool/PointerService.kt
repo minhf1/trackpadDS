@@ -840,7 +840,7 @@ class PointerService : Service() {
             return
         }
 
-        val sizePx = dp(metrics, 44)
+        val sizePx = getButtonSizePx(metrics)
         val gapPx = dp(metrics, 8)
         val baseX = dp(metrics, 16)
         val baseY = dp(metrics, 16)
@@ -1202,6 +1202,8 @@ class PointerService : Service() {
         updateLightOverlayVisibility()
         updateLightPrimaryButtonVisibility()
         updateHideOverlaysVisuals()
+        updateFloatingButtonSizes(wm, metrics)
+        updateLightPrimaryButtonSize()
         applyTrackpadSizes(wm, metrics)
         updateTrackpadHeaderVisibility(!navButtonsEnabled)
         updateTrackpadVisibility(padViewA, padLpA, showPadRight, wm)
@@ -1319,10 +1321,10 @@ class PointerService : Service() {
     ) {
         if (enabled) {
             if (currentView != null && currentLp != null && currentView.parent != null) return
-            val sizePx = dp(metrics, 44)
-            val gapPx = dp(metrics, 8)
-            val baseX = dp(metrics, 16)
-            val baseY = dp(metrics, 16)
+            val sizePx = getButtonSizePx(metrics)
+        val gapPx = dp(metrics, 8)
+        val baseX = dp(metrics, 16)
+        val baseY = dp(metrics, 16)
             val indexOffset = when (key) {
                 "nav_back" -> 0
                 "nav_home" -> 1
@@ -1669,6 +1671,47 @@ class PointerService : Service() {
     private fun dp(metrics: android.util.DisplayMetrics, dp: Int): Int =
         (dp * metrics.density).roundToInt()
 
+    private fun getButtonSizePx(metrics: android.util.DisplayMetrics): Int {
+        val minPx = dp(metrics, 24)
+        val maxPx = dp(metrics, 120)
+        val defaultPx = dp(metrics, 44)
+        return uiPrefs.getInt("button_size", defaultPx).coerceIn(minPx, maxPx)
+    }
+
+    private fun updateFloatingButtonSizes(
+        wm: WindowManager,
+        metrics: android.util.DisplayMetrics
+    ) {
+        val sizePx = getButtonSizePx(metrics)
+        updateButtonSizeFor(wm, backView, backLp, sizePx)
+        updateButtonSizeFor(wm, homeView, homeLp, sizePx)
+        updateButtonSizeFor(wm, recentsView, recentsLp, sizePx)
+        updateButtonSizeFor(wm, closeView, closeLp, sizePx)
+        updateButtonSizeFor(wm, dragToggleView, dragToggleLp, sizePx)
+        updateButtonSizeFor(wm, navToggleView, navToggleLp, sizePx)
+        updateButtonSizeFor(wm, hideToggleView, hideToggleLp, sizePx)
+        updateButtonSizeFor(wm, swapView, swapLp, sizePx)
+        updateButtonSizeFor(wm, lightToggleView, lightToggleLp, sizePx)
+        updateButtonSizeFor(wm, mirrorToggleView, mirrorToggleLp, sizePx)
+        updateButtonSizeFor(wm, clickView, clickLp, sizePx)
+        updateButtonSizeFor(wm, rightClickView, rightClickLp, sizePx)
+    }
+
+    private fun updateButtonSizeFor(
+        wm: WindowManager,
+        view: View?,
+        lp: WindowManager.LayoutParams?,
+        sizePx: Int
+    ) {
+        if (view == null || lp == null) return
+        if (lp.width == sizePx && lp.height == sizePx) return
+        lp.width = sizePx
+        lp.height = sizePx
+        val bg = view.background as? GradientDrawable
+        bg?.cornerRadius = sizePx / 2f
+        try { wm.updateViewLayout(view, lp) } catch (_: Throwable) {}
+    }
+
     private fun createButtonLayoutParams(
         key: String,
         sizePx: Int,
@@ -1991,7 +2034,7 @@ class PointerService : Service() {
     private fun ensureLightPrimaryButton(ctx: Context) {
         if (lightPrimaryView != null) return
         val metrics = ctx.resources.displayMetrics
-        val sizePx = dp(metrics, 44)
+        val sizePx = getButtonSizePx(metrics)
         lightPrimaryView = ImageButton(ctx).apply {
             background = GradientDrawable().apply {
                 cornerRadius = (sizePx / 2f)
@@ -2123,6 +2166,21 @@ class PointerService : Service() {
             try { wm.updateViewLayout(view, lp) } catch (_: Throwable) {}
         }
         updateLightPrimaryButtonAppearance()
+    }
+
+    private fun updateLightPrimaryButtonSize() {
+        val view = lightPrimaryView ?: return
+        val lp = lightPrimaryLp ?: return
+        val metrics = view.resources.displayMetrics
+        val sizePx = getButtonSizePx(metrics)
+        if (lp.width == sizePx && lp.height == sizePx) return
+        lp.width = sizePx
+        lp.height = sizePx
+        val bg = view.background as? GradientDrawable
+        bg?.cornerRadius = sizePx / 2f
+        if (view.parent != null) {
+            try { lightPrimaryWm?.updateViewLayout(view, lp) } catch (_: Throwable) {}
+        }
     }
 
     private fun getDragBounds(v: View, lp: WindowManager.LayoutParams): Pair<Int, Int> {

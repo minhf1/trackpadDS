@@ -242,7 +242,7 @@ class MirrorActivity : Activity() {
         index: Int,
         action: () -> Unit
     ): ImageButton {
-        val sizePx = dp(44)
+        val sizePx = getButtonSizePx()
         val uiPrefs = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
         val button = ImageButton(this).apply {
             tag = key
@@ -281,7 +281,7 @@ class MirrorActivity : Activity() {
         index: Int
     ) {
         val prefs = getSharedPreferences("mirror_positions", Context.MODE_PRIVATE)
-        val sizePx = dp(44)
+        val sizePx = getButtonSizePx()
         val gapPx = dp(8)
         val margin = dp(16)
         val defaultX = (root.width - sizePx - margin).coerceAtLeast(0)
@@ -434,5 +434,13 @@ class MirrorActivity : Activity() {
 
     private fun dp(v: Int): Int {
         return (v * resources.displayMetrics.density).toInt()
+    }
+
+    private fun getButtonSizePx(): Int {
+        val prefs = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
+        val minPx = dp(24)
+        val maxPx = dp(120)
+        val defaultPx = dp(44)
+        return prefs.getInt("button_size", defaultPx).coerceIn(minPx, maxPx)
     }
 }

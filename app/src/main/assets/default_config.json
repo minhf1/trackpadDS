@@ -5,6 +5,7 @@
     "overlay_running": false,
     "show_trackpad_right": true,
     "button_opacity": 100,
+    "button_size": 101,
     "trackpad_opacity": 100,
     "show_stop_btn": true,
     "show_nav_buttons": false,

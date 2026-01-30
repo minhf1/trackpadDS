@@ -467,12 +467,13 @@ class MainActivity : ComponentActivity() {
     private fun buildTrackpadSizeMenu(): LinearLayout {
         val prefs = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
         val bounds = getTrackpadSizeBounds()
+        val buttonBounds = getButtonSizeBounds()
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
 
         val sectionHeader = buildSectionHeader(
-            title = "Trackpad size",
+            title = "Trackpad/button size",
             subtitle = "Set width and height for each trackpad"
         )
 
@@ -493,6 +494,10 @@ class MainActivity : ComponentActivity() {
 
         options.addView(space(8))
         options.addView(buildSizeCopyButtons(prefs))
+
+        options.addView(space(8))
+        options.addView(buildGroupHeaderRow("Buttons", R.drawable.ic_menu, flipIcon = false))
+        options.addView(buildNumberInputRow("Button size", "button_size", prefs, buttonBounds.minPx, buttonBounds.maxPx))
 
         sectionHeader.setOnClickListener {
             options.visibility =
@@ -994,6 +999,11 @@ class MainActivity : ComponentActivity() {
         val maxHeightPx: Int
     )
 
+    private data class ButtonSizeBounds(
+        val minPx: Int,
+        val maxPx: Int
+    )
+
     private fun getTrackpadSizeBounds(): TrackpadSizeBounds {
         val minPx = dp(120)
         val dm = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
@@ -1009,6 +1019,12 @@ class MainActivity : ComponentActivity() {
         val maxWidth = metrics.widthPixels.coerceAtLeast(minPx)
         val maxHeight = metrics.heightPixels.coerceAtLeast(minPx)
         return TrackpadSizeBounds(minPx, maxWidth, maxHeight)
+    }
+
+    private fun getButtonSizeBounds(): ButtonSizeBounds {
+        val minPx = dp(24)
+        val maxPx = dp(120)
+        return ButtonSizeBounds(minPx, maxPx)
     }
 
     private fun exportSettingsToUri(uri: Uri) {
