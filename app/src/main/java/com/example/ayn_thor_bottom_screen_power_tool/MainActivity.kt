@@ -619,6 +619,12 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.ic_light_bulb,
             prefs = prefs
         ))
+        lightOffOptions.addView(buildToggleRow(
+            label = "Display light off button on the primary screen while bottom screen is off",
+            key = "light_off_primary_button",
+            icon = R.drawable.ic_light_bulb,
+            prefs = prefs
+        ))
 
         val hapticHeader = buildSubgroupHeaderRow(
             title = "Trackpad haptic feedback",

@@ -87,6 +87,7 @@ class PointerService : Service() {
     private var clickThroughEnabled = false
     private var lightOverlayEnabled = false
     private var lightOffKeepControls = false
+    private var lightOffPrimaryButton = false
     private var activityTaskService: Any? = null
     private val uiPrefs by lazy {
         getSharedPreferences("ui_config", Context.MODE_PRIVATE)
@@ -126,6 +127,9 @@ class PointerService : Service() {
     private var mirrorClickLp: WindowManager.LayoutParams? = null
     private var lightOverlayView: View? = null
     private var lightOverlayLp: WindowManager.LayoutParams? = null
+    private var lightPrimaryView: ImageButton? = null
+    private var lightPrimaryLp: WindowManager.LayoutParams? = null
+    private var lightPrimaryWm: WindowManager? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -192,6 +196,7 @@ class PointerService : Service() {
         val displayCtx = createDisplayContext(primary)
 
         cursorWm = displayCtx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        ensureLightPrimaryButton(displayCtx)
 
         val metrics = displayCtx.resources.displayMetrics
         PointerBus.setDisplaySize(metrics.widthPixels, metrics.heightPixels)
@@ -293,6 +298,7 @@ class PointerService : Service() {
         cursorWm = null
         cursorLp = null
         cursorSizePx = 0
+        detachLightPrimaryButton()
     }
 
     private fun attachTrackpadOverlayToSecondary() {
@@ -971,6 +977,7 @@ class PointerService : Service() {
         trackpadOpacity = uiPrefs.getInt("trackpad_opacity", 100).coerceIn(0, 100)
         lightOverlayEnabled = uiPrefs.getBoolean("light_overlay_enabled", false)
         lightOffKeepControls = uiPrefs.getBoolean("light_off_keep_controls", false)
+        lightOffPrimaryButton = uiPrefs.getBoolean("light_off_primary_button", false)
 
         android.util.Log.d("PointerService", "buttonOpacity $buttonOpacity")
 
@@ -1187,6 +1194,7 @@ class PointerService : Service() {
         updateTrackpadOpacity(trackpadOpacity)
         updateLightToggleAppearance()
         updateLightOverlayVisibility()
+        updateLightPrimaryButtonVisibility()
         updateHideOverlaysVisuals()
         applyTrackpadSizes(wm, metrics)
         updateTrackpadHeaderVisibility(!navButtonsEnabled)
@@ -1689,7 +1697,7 @@ class PointerService : Service() {
 
     private fun updateDragModeVisuals() {
         if (shouldHideControlsForLightOff()) {
-            applyHideOverlaysVisuals(true, lightToggleView)
+            applyHideOverlaysVisuals(true, getLightOffKeepVisibleButton())
             return
         }
         if (hideOverlays) return
@@ -1749,7 +1757,7 @@ class PointerService : Service() {
         uiPrefs.edit().putBoolean("light_overlay_enabled", lightOverlayEnabled).apply()
         updateLightToggleAppearance()
         updateLightOverlayVisibility()
-        // Light Off Mode hide-controls logic removed here for later rework.
+        updateLightPrimaryButtonVisibility()
         updateHideOverlaysVisuals()
     }
 
@@ -1796,7 +1804,7 @@ class PointerService : Service() {
 
     private fun updateHideOverlaysVisuals() {
         if (shouldHideControlsForLightOff()) {
-            applyHideOverlaysVisuals(true, lightToggleView)
+            applyHideOverlaysVisuals(true, getLightOffKeepVisibleButton())
             return
         }
         applyHideOverlaysVisuals(hideOverlays, hideToggleView)
@@ -1959,6 +1967,151 @@ class PointerService : Service() {
         } else {
             button.setImageResource(R.drawable.ic_light_bulb_off)
         }
+    }
+
+    private fun updateLightPrimaryButtonAppearance() {
+        val button = lightPrimaryView ?: return
+        val bg = button.background as? GradientDrawable ?: return
+        bg.setColor(Color.argb(110, 60, 60, 60))
+        if (lightOverlayEnabled) {
+            button.setImageResource(R.drawable.ic_light_bulb)
+        } else {
+            button.setImageResource(R.drawable.ic_light_bulb_off)
+        }
+    }
+
+    private fun ensureLightPrimaryButton(ctx: Context) {
+        if (lightPrimaryView != null) return
+        val metrics = ctx.resources.displayMetrics
+        val sizePx = dp(metrics, 44)
+        lightPrimaryView = ImageButton(ctx).apply {
+            background = GradientDrawable().apply {
+                cornerRadius = (sizePx / 2f)
+                setColor(Color.argb(110, 60, 60, 60))
+            }
+            setImageResource(R.drawable.ic_light_bulb)
+            setColorFilter(Color.WHITE)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setOnClickListener {
+                if (uiPrefs.getBoolean("haptic_button_press", true)) {
+                    performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                }
+                toggleLightOverlay()
+            }
+        }
+        lightPrimaryView?.setOnTouchListener(
+            PrimaryLightDragTouchListener(
+                { lightPrimaryLp },
+                { lp ->
+                    lightPrimaryLp = lp
+                    try { lightPrimaryWm?.updateViewLayout(lightPrimaryView, lp) } catch (_: Throwable) {}
+                }
+            )
+        )
+        lightPrimaryLp = WindowManager.LayoutParams(
+            sizePx,
+            sizePx,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = dp(metrics, 16)
+            y = dp(metrics, 16)
+        }
+        lightPrimaryWm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        updateLightPrimaryButtonAppearance()
+    }
+
+    private inner class PrimaryLightDragTouchListener(
+        private val getLp: () -> WindowManager.LayoutParams?,
+        private val update: (WindowManager.LayoutParams) -> Unit
+    ) : View.OnTouchListener {
+        private var lastX = 0f
+        private var lastY = 0f
+        private var moved = false
+        private var touchSlop = 0
+
+        override fun onTouch(v: View, e: MotionEvent): Boolean {
+            val lp = getLp() ?: return false
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    lastX = e.rawX
+                    lastY = e.rawY
+                    moved = false
+                    if (touchSlop == 0) {
+                        touchSlop = ViewConfiguration.get(v.context).scaledTouchSlop
+                    }
+                    return true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = e.rawX - lastX
+                    val dy = e.rawY - lastY
+                    lastX = e.rawX
+                    lastY = e.rawY
+
+                    if (!moved &&
+                        (kotlin.math.abs(dx) >= touchSlop || kotlin.math.abs(dy) >= touchSlop)) {
+                        moved = true
+                    }
+
+                    if (moved) {
+                        val (maxX, maxY) = getDragBounds(v, lp)
+                        val newX = (lp.x + dx).toInt().coerceIn(0, maxX.coerceAtLeast(0))
+                        val newY = (lp.y + dy).toInt().coerceIn(0, maxY.coerceAtLeast(0))
+                        lp.x = newX
+                        lp.y = newY
+                        update(lp)
+                    }
+                    return true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (!moved) {
+                        v.performClick()
+                    }
+                    return true
+                }
+            }
+            return false
+        }
+    }
+
+    private fun detachLightPrimaryButton() {
+        val wm = lightPrimaryWm
+        val view = lightPrimaryView
+        if (wm != null && view != null) {
+            try {
+                if (view.parent != null) {
+                    wm.removeViewImmediate(view)
+                }
+            } catch (_: Throwable) {
+            }
+        }
+        lightPrimaryView = null
+        lightPrimaryLp = null
+        lightPrimaryWm = null
+    }
+
+    private fun updateLightPrimaryButtonVisibility() {
+        val shouldShow = lightOverlayEnabled && lightOffPrimaryButton
+        if (!shouldShow) {
+            val view = lightPrimaryView
+            if (view != null && view.parent != null) {
+                try { lightPrimaryWm?.removeView(view) } catch (_: Throwable) {}
+            }
+            return
+        }
+        val wm = lightPrimaryWm ?: return
+        val view = lightPrimaryView ?: return
+        val lp = lightPrimaryLp ?: return
+        if (view.parent == null) {
+            try { wm.addView(view, lp) } catch (_: Throwable) {}
+        } else {
+            try { wm.updateViewLayout(view, lp) } catch (_: Throwable) {}
+        }
+        updateLightPrimaryButtonAppearance()
     }
 
     private fun getDragBounds(v: View, lp: WindowManager.LayoutParams): Pair<Int, Int> {
@@ -2336,6 +2489,10 @@ class PointerService : Service() {
     }
 
     private fun shouldHideControlsForLightOff(): Boolean {
-        return lightOverlayEnabled && !lightOffKeepControls
+        return lightOverlayEnabled && lightOffKeepControls
+    }
+
+    private fun getLightOffKeepVisibleButton(): View? {
+        return if (lightOffPrimaryButton) null else lightToggleView
     }
 }

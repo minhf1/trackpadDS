@@ -33,7 +33,8 @@
     "mirror_show_home": false,
     "trackpad_click_multitouch": true,
     "light_overlay_enabled": false,
-    "light_off_keep_controls": false
+    "light_off_keep_controls": true,
+    "light_off_primary_button": true
   },
   "floating_positions": {
     "pad_a_y": 619,
