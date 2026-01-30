@@ -49,6 +49,10 @@ class PointerAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 
+    fun getLastTopComponent(displayId: Int): ComponentName? {
+        return lastTopByDisplay[displayId]
+    }
+
     fun swapByLaunchingApps(primaryId: Int, secondaryId: Int) {
         val primaryComp = lastTopByDisplay[primaryId]
         val secondaryComp = lastTopByDisplay[secondaryId]
