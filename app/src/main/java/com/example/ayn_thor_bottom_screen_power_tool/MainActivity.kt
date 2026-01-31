@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.display.DisplayManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Display
@@ -26,6 +25,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import org.json.JSONObject
 import kotlin.math.roundToInt
+import androidx.core.content.edit
 
 class MainActivity : ComponentActivity() {
     private var pendingStart = false
@@ -46,6 +46,13 @@ class MainActivity : ComponentActivity() {
             importSettingsFromUri(uri)
         }
     }
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        if (pendingStart) {
+            proceedStartFlow()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,27 +60,32 @@ class MainActivity : ComponentActivity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 32, 32, 32)
-            setBackgroundColor(0xFF000000.toInt())
+            setPadding(
+                UiConstants.Spacing.SCREEN_PADDING,
+                UiConstants.Spacing.SCREEN_PADDING,
+                UiConstants.Spacing.SCREEN_PADDING,
+                UiConstants.Spacing.SCREEN_PADDING
+            )
+            setBackgroundColor(UiConstants.Colors.BLACK)
         }
 
         root.addView(buildKofiBanner())
-        root.addView(space(12))
+        root.addView(space(UiConstants.Spacing.SMALL_GAP))
 
         buildPermissionNotice()?.let { notice ->
             root.addView(notice)
-            root.addView(space(12))
+            root.addView(space(UiConstants.Spacing.SMALL_GAP))
         }
 
         startBtn = Button(this)
         updateOverlayButtonState()
 
         root.addView(startBtn)
-        root.addView(space(12))
+        root.addView(space(UiConstants.Spacing.SMALL_GAP))
         root.addView(buildButtonsMenu())
 
         val scroll = ScrollView(this).apply {
-            setBackgroundColor(0xFF000000.toInt())
+            setBackgroundColor(UiConstants.Colors.BLACK)
             addView(root)
         }
 
@@ -108,17 +120,6 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 1001 && pendingStart) {
-            proceedStartFlow()
-        }
-    }
-
     private fun requestOverlayPermission() {
         if (!Settings.canDrawOverlays(this)) {
             val intent = Intent(
@@ -143,20 +144,24 @@ class MainActivity : ComponentActivity() {
     private fun buildPermissionNotice(): LinearLayout? {
         val overlayMissing = !Settings.canDrawOverlays(this)
         val a11yMissing = !isPointerA11yEnabled()
-        val notifMissing = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        val notifMissing = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         if (!overlayMissing && !a11yMissing && !notifMissing) return null
 
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(16, 16, 16, 16)
-            setBackgroundColor(0xFF1A1A1A.toInt())
+            setPadding(
+                UiConstants.Spacing.CARD_PADDING,
+                UiConstants.Spacing.CARD_PADDING,
+                UiConstants.Spacing.CARD_PADDING,
+                UiConstants.Spacing.CARD_PADDING
+            )
+            setBackgroundColor(UiConstants.Colors.SURFACE)
         }
 
         val title = TextView(this).apply {
             text = "Read before using the app, there are a few permissions needed and here is how the app use them"
-            textSize = 16f
-            setTextColor(0xFFFFFFFF.toInt())
+            textSize = UiConstants.Text.SECTION
+            setTextColor(UiConstants.Colors.WHITE)
         }
 
         val bullets = mutableListOf<String>().apply {
@@ -172,12 +177,12 @@ class MainActivity : ComponentActivity() {
         }
 
         container.addView(title)
-        container.addView(space(6))
+        container.addView(space(UiConstants.Spacing.TINY_GAP))
         for (item in bullets) {
             val line = TextView(this).apply {
                 text = "- $item"
-                textSize = 13f
-                setTextColor(0xFF9A9A9A.toInt())
+                textSize = UiConstants.Text.SUBTITLE
+                setTextColor(UiConstants.Colors.TEXT_SECONDARY)
             }
             container.addView(line)
         }
@@ -194,19 +199,17 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1001)
-                return
-            }
+        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            return
         }
 
         // Start cursor overlay service
         startForegroundService(Intent(this, PointerService::class.java))
         getSharedPreferences("ui_config", MODE_PRIVATE)
-            .edit()
-            .putBoolean("overlay_running", true)
-            .apply()
+            .edit {
+                putBoolean("overlay_running", true)
+            }
         updateOverlayButtonState()
         pendingStart = false
 
@@ -232,7 +235,7 @@ class MainActivity : ComponentActivity() {
         val uiPrefs = getSharedPreferences("ui_config", MODE_PRIVATE)
         if (uiPrefs.getBoolean("defaults_loaded", false)) return
         if (uiPrefs.all.isNotEmpty()) {
-            uiPrefs.edit().putBoolean("defaults_loaded", true).apply()
+            uiPrefs.edit { putBoolean("defaults_loaded", true) }
             return
         }
         try {
@@ -309,11 +312,11 @@ class MainActivity : ComponentActivity() {
             ToggleSpec("show_right_click_btn", "Right-click button", R.drawable.ic_trackpad_right_click),
             ToggleSpec("show_trackpad_left", "Left trackpad", R.drawable.trackpad_right, flipIcon = true),
             ToggleSpec("show_trackpad_right", "Right trackpad", R.drawable.trackpad_right)
-        ), prefs, paddingTopDp = 6)
+        ), prefs)
         options.addView(trackpadHeader)
         options.addView(trackpadOptions)
 
-        options.addView(space(8))
+        options.addView(space(UiConstants.Spacing.SMALL_GAP))
         val mirrorHeader = buildSubgroupHeaderRow(
             title = "Screen mirror mode",
             subtitle = "Buttons visible in mirror mode",
@@ -326,7 +329,7 @@ class MainActivity : ComponentActivity() {
             ToggleSpec("mirror_show_back", "Back button", R.drawable.ic_back),
             ToggleSpec("mirror_show_home", "Home button", R.drawable.ic_home),
             ToggleSpec("mirror_show_drag", "Drag toggle button", R.drawable.ic_drag)
-        ), prefs, paddingTopDp = 6)
+        ), prefs, paddingTopDp = UiConstants.Spacing.SUBGROUP_TOP)
         options.addView(mirrorHeader)
         options.addView(mirrorOptions)
 
@@ -334,13 +337,13 @@ class MainActivity : ComponentActivity() {
 
         container.addView(sectionHeader)
         container.addView(options)
-        container.addView(space(16))
+        container.addView(space(UiConstants.Spacing.SECTION_GAP))
         container.addView(buildOpacityMenu())
-        container.addView(space(16))
+        container.addView(space(UiConstants.Spacing.SECTION_GAP))
         container.addView(buildBehaviorMenu())
-        container.addView(space(16))
+        container.addView(space(UiConstants.Spacing.SECTION_GAP))
         container.addView(buildTrackpadSizeMenu())
-        container.addView(space(16))
+        container.addView(space(UiConstants.Spacing.SECTION_GAP))
         container.addView(buildBackupImportMenu())
         return container
     }
@@ -348,8 +351,13 @@ class MainActivity : ComponentActivity() {
     private fun buildKofiBanner(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(16, 16, 16, 16)
-            setBackgroundColor(0xFF141414.toInt())
+            setPadding(
+                UiConstants.Spacing.CARD_PADDING,
+                UiConstants.Spacing.CARD_PADDING,
+                UiConstants.Spacing.CARD_PADDING,
+                UiConstants.Spacing.CARD_PADDING
+            )
+            setBackgroundColor(UiConstants.Colors.BANNER_BG)
             gravity = android.view.Gravity.CENTER_VERTICAL
             setOnClickListener {
                 val uri = Uri.parse("https://ko-fi.com/minxf1")
@@ -358,8 +366,8 @@ class MainActivity : ComponentActivity() {
 
             val textView = TextView(context).apply {
                 text = "Buy me coffee if you love the app"
-                textSize = 14f
-                setTextColor(0xFFE0E0E0.toInt())
+                textSize = UiConstants.Text.BANNER
+                setTextColor(UiConstants.Colors.TEXT_PRIMARY)
                 gravity = android.view.Gravity.CENTER_VERTICAL
                 setTypeface(typeface, android.graphics.Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(
@@ -375,8 +383,11 @@ class MainActivity : ComponentActivity() {
                 setImageResource(R.drawable.support_me_on_kofi_dark)
                 adjustViewBounds = true
                 scaleType = ImageView.ScaleType.FIT_CENTER
-                layoutParams = LinearLayout.LayoutParams(dp(120), dp(28)).apply {
-                    marginStart = dp(12)
+                layoutParams = LinearLayout.LayoutParams(
+                    dp(UiConstants.Sizes.BANNER_WIDTH),
+                    dp(UiConstants.Sizes.BANNER_HEIGHT)
+                ).apply {
+                    marginStart = dp(UiConstants.Spacing.BANNER_ICON_MARGIN)
                 }
             }
             addView(iconView)
@@ -386,17 +397,22 @@ class MainActivity : ComponentActivity() {
     private fun buildSectionHeader(title: String, subtitle: String): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(16, 16, 16, 16)
-            setBackgroundColor(0xFF0A0A0A.toInt())
+            setPadding(
+                UiConstants.Spacing.CARD_PADDING,
+                UiConstants.Spacing.CARD_PADDING,
+                UiConstants.Spacing.CARD_PADDING,
+                UiConstants.Spacing.CARD_PADDING
+            )
+            setBackgroundColor(UiConstants.Colors.SURFACE_DARK)
             addView(TextView(context).apply {
                 text = title
-                textSize = 18f
-                setTextColor(0xFFFFFFFF.toInt())
+                textSize = UiConstants.Text.TITLE
+                setTextColor(UiConstants.Colors.WHITE)
             })
             addView(TextView(context).apply {
                 text = subtitle
-                textSize = 13f
-                setTextColor(0xFF9A9A9A.toInt())
+                textSize = UiConstants.Text.SUBTITLE
+                setTextColor(UiConstants.Colors.TEXT_SECONDARY)
             })
         }
     }
@@ -443,15 +459,15 @@ class MainActivity : ComponentActivity() {
         options.addView(buildNumberInputRow("Width", "trackpad_left_width", prefs, bounds.minPx, bounds.maxWidthPx))
         options.addView(buildNumberInputRow("Height", "trackpad_left_height", prefs, bounds.minPx, bounds.maxHeightPx))
 
-        options.addView(space(8))
+        options.addView(space(UiConstants.Spacing.SMALL_GAP))
         options.addView(buildGroupHeaderRow("Right trackpad", R.drawable.trackpad_right, flipIcon = false))
         options.addView(buildNumberInputRow("Width", "trackpad_right_width", prefs, bounds.minPx, bounds.maxWidthPx))
         options.addView(buildNumberInputRow("Height", "trackpad_right_height", prefs, bounds.minPx, bounds.maxHeightPx))
 
-        options.addView(space(8))
+        options.addView(space(UiConstants.Spacing.SMALL_GAP))
         options.addView(buildSizeCopyButtons(prefs))
 
-        options.addView(space(8))
+        options.addView(space(UiConstants.Spacing.SMALL_GAP))
         options.addView(buildGroupHeaderRow("Buttons", R.drawable.ic_menu, flipIcon = false))
         options.addView(buildNumberInputRow("Button size", "button_size", prefs, buttonBounds.minPx, buttonBounds.maxPx))
 
@@ -487,34 +503,34 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.trackpad_right,
             flipIcon = true
         )
-        val trackpadOptions = buildOptionsContainer(paddingTopDp = 6)
+        val trackpadOptions = buildOptionsContainer(paddingTopDp = UiConstants.Spacing.SUBGROUP_TOP)
         toggleVisibilityOnClick(trackpadHeader, trackpadOptions)
         trackpadOptions.addView(buildFloatSliderRow(
             label = "Cursor sensitivity",
             key = "cursor_sensitivity",
             prefs = prefs,
             icon = android.R.drawable.ic_menu_mylocation,
-            minValue = 0.5f,
-            maxValue = 6f,
-            defaultValue = 4.5f
+            minValue = UiConstants.Sliders.CURSOR_SENSITIVITY_MIN,
+            maxValue = UiConstants.Sliders.CURSOR_SENSITIVITY_MAX,
+            defaultValue = UiConstants.Sliders.CURSOR_SENSITIVITY_DEFAULT
         ))
         trackpadOptions.addView(buildIntSliderRow(
             label = "Scroll sensitivity",
             key = "scroll_sensitivity",
             prefs = prefs,
             icon = R.drawable.ic_scroll_sensitivity,
-            minValue = 1,
-            maxValue = 100,
-            defaultValue = 40
+            minValue = UiConstants.Sliders.SCROLL_SENSITIVITY_MIN,
+            maxValue = UiConstants.Sliders.SCROLL_SENSITIVITY_MAX,
+            defaultValue = UiConstants.Sliders.SCROLL_SENSITIVITY_DEFAULT
         ))
         trackpadOptions.addView(buildIntSliderRow(
             label = "Cursor fade delay (ms)",
             key = "cursor_fade_timeout_ms",
             prefs = prefs,
             icon = R.drawable.ic_cursor_fade_timeout,
-            minValue = 250,
-            maxValue = 5000,
-            defaultValue = 1000
+            minValue = UiConstants.Sliders.CURSOR_FADE_MIN_MS,
+            maxValue = UiConstants.Sliders.CURSOR_FADE_MAX_MS,
+            defaultValue = UiConstants.Sliders.CURSOR_FADE_DEFAULT_MS
         ))
 
         val trackpadModeHeader = buildSubgroupHeaderRow(
@@ -523,7 +539,7 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.ic_trackpad_click,
             flipIcon = false
         )
-        val trackpadModeOptions = buildOptionsContainer(paddingTopDp = 6)
+        val trackpadModeOptions = buildOptionsContainer(paddingTopDp = UiConstants.Spacing.SUBGROUP_TOP)
         toggleVisibilityOnClick(trackpadModeHeader, trackpadModeOptions)
         trackpadModeOptions.addView(buildToggleRow(
             label = "Click button hold for a right-click",
@@ -544,7 +560,7 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.ic_light_bulb,
             flipIcon = false
         )
-        val lightOffOptions = buildOptionsContainer(paddingTopDp = 6)
+        val lightOffOptions = buildOptionsContainer(paddingTopDp = UiConstants.Spacing.SUBGROUP_TOP)
         toggleVisibilityOnClick(lightOffHeader, lightOffOptions)
         lightOffOptions.addView(buildToggleRow(
             label = "Keep controller element ON when Light Off",
@@ -578,7 +594,7 @@ class MainActivity : ComponentActivity() {
                 prefs.edit().putBoolean("light_off_primary_button", false).apply()
             }
         }
-        syncPrimaryEnabled?.invoke()
+        syncPrimaryEnabled.invoke()
 
         val hapticHeader = buildSubgroupHeaderRow(
             title = "Trackpad haptic feedback",
@@ -586,7 +602,7 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.ic_haptic_feedback,
             flipIcon = false
         )
-        val hapticOptions = buildOptionsContainer(paddingTopDp = 6)
+        val hapticOptions = buildOptionsContainer(paddingTopDp = UiConstants.Spacing.SUBGROUP_TOP)
         toggleVisibilityOnClick(hapticHeader, hapticOptions)
         hapticOptions.addView(buildToggleRow(
             label = "Button haptic feedback",
@@ -613,7 +629,7 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.ic_mirror,
             flipIcon = false
         )
-        val mirrorOptions = buildOptionsContainer(paddingTopDp = 6)
+        val mirrorOptions = buildOptionsContainer(paddingTopDp = UiConstants.Spacing.SUBGROUP_TOP)
         toggleVisibilityOnClick(mirrorHeader, mirrorOptions)
         mirrorOptions.addView(buildToggleRow(
             label = "Button haptic feedback",
@@ -630,16 +646,16 @@ class MainActivity : ComponentActivity() {
 
         options.addView(trackpadHeader)
         options.addView(trackpadOptions)
-        options.addView(space(8))
+        options.addView(space(UiConstants.Spacing.SMALL_GAP))
         options.addView(trackpadModeHeader)
         options.addView(trackpadModeOptions)
-        options.addView(space(8))
+        options.addView(space(UiConstants.Spacing.SMALL_GAP))
         options.addView(lightOffHeader)
         options.addView(lightOffOptions)
-        options.addView(space(8))
+        options.addView(space(UiConstants.Spacing.SMALL_GAP))
         options.addView(hapticHeader)
         options.addView(hapticOptions)
-        options.addView(space(8))
+        options.addView(space(UiConstants.Spacing.SMALL_GAP))
         options.addView(mirrorHeader)
         options.addView(mirrorOptions)
 
@@ -677,7 +693,7 @@ class MainActivity : ComponentActivity() {
         }
 
         options.addView(backupBtn)
-        options.addView(space(6))
+        options.addView(space(UiConstants.Spacing.TINY_GAP))
         options.addView(importBtn)
 
         toggleVisibilityOnClick(sectionHeader, options)
@@ -694,14 +710,22 @@ class MainActivity : ComponentActivity() {
     ): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(12, 12, 12, 12)
-            setBackgroundColor(0xFF1A1A1A.toInt())
+            setPadding(
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING
+            )
+            setBackgroundColor(UiConstants.Colors.SURFACE)
 
             val iconView = ImageView(this@MainActivity).apply {
                 setImageResource(icon)
-                setColorFilter(0xFFE0E0E0.toInt())
-                layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply {
-                    marginEnd = dp(12)
+                setColorFilter(UiConstants.Colors.TEXT_PRIMARY)
+                layoutParams = LinearLayout.LayoutParams(
+                    dp(UiConstants.Sizes.ICON),
+                    dp(UiConstants.Sizes.ICON)
+                ).apply {
+                    marginEnd = dp(UiConstants.Spacing.ICON_MARGIN)
                 }
                 if (flipIcon) {
                     scaleX = -1f
@@ -709,9 +733,9 @@ class MainActivity : ComponentActivity() {
             }
 
             val text = TextView(this@MainActivity).apply {
-                textSize = 15f
+                textSize = UiConstants.Text.BODY
                 text = label
-                setTextColor(0xFFE0E0E0.toInt())
+                setTextColor(UiConstants.Colors.TEXT_PRIMARY)
                 layoutParams = LinearLayout.LayoutParams(
                     0,
                     LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -733,24 +757,34 @@ class MainActivity : ComponentActivity() {
     ): LinearLayout {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(12, 12, 12, 12)
-            setBackgroundColor(0xFF1A1A1A.toInt())
+            setPadding(
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING
+            )
+            setBackgroundColor(UiConstants.Colors.SURFACE)
         }
 
         val text = TextView(this).apply {
-            textSize = 15f
+            textSize = UiConstants.Text.BODY
             text = label
-            setTextColor(0xFFE0E0E0.toInt())
+            setTextColor(UiConstants.Colors.TEXT_PRIMARY)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
         val input = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_NUMBER
             imeOptions = EditorInfo.IME_ACTION_DONE
-            setTextColor(0xFFE0E0E0.toInt())
-            setBackgroundColor(0xFF151515.toInt())
-            setPadding(dp(8), dp(6), dp(8), dp(6))
-            val defaultValue = prefs.getInt(key, dp(200))
+            setTextColor(UiConstants.Colors.TEXT_PRIMARY)
+            setBackgroundColor(UiConstants.Colors.INPUT_BG)
+            setPadding(
+                dp(UiConstants.Spacing.SMALL_GAP),
+                dp(UiConstants.Spacing.TINY_GAP),
+                dp(UiConstants.Spacing.SMALL_GAP),
+                dp(UiConstants.Spacing.TINY_GAP)
+            )
+            val defaultValue = prefs.getInt(key, dp(UiConstants.Sizes.DEFAULT_TRACKPAD_SIZE))
             setText(defaultValue.toString())
             setOnFocusChangeListener { _, hasFocus ->
                 if (!hasFocus) {
@@ -766,7 +800,10 @@ class MainActivity : ComponentActivity() {
                     false
                 }
             }
-            layoutParams = LinearLayout.LayoutParams(dp(120), LinearLayout.LayoutParams.WRAP_CONTENT)
+            layoutParams = LinearLayout.LayoutParams(
+                dp(UiConstants.Sizes.INPUT_WIDTH),
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
         sizeInputs[key] = input
 
@@ -783,14 +820,22 @@ class MainActivity : ComponentActivity() {
     ): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(12, 12, 12, 12)
-            setBackgroundColor(0xFF121212.toInt())
+            setPadding(
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING
+            )
+            setBackgroundColor(UiConstants.Colors.SURFACE_ALT)
 
             val iconView = ImageView(this@MainActivity).apply {
                 setImageResource(icon)
-                setColorFilter(0xFFE0E0E0.toInt())
-                layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply {
-                    marginEnd = dp(12)
+                setColorFilter(UiConstants.Colors.TEXT_PRIMARY)
+                layoutParams = LinearLayout.LayoutParams(
+                    dp(UiConstants.Sizes.ICON),
+                    dp(UiConstants.Sizes.ICON)
+                ).apply {
+                    marginEnd = dp(UiConstants.Spacing.ICON_MARGIN)
                 }
                 if (flipIcon) {
                     scaleX = -1f
@@ -807,16 +852,16 @@ class MainActivity : ComponentActivity() {
             }
 
             val titleView = TextView(this@MainActivity).apply {
-                textSize = 16f
+                textSize = UiConstants.Text.SECTION
                 text = title
-                setTextColor(0xFFE8E8E8.toInt())
+                setTextColor(UiConstants.Colors.TEXT_EMPHASIS)
                 setTypeface(typeface, android.graphics.Typeface.BOLD)
             }
 
             val subtitleView = TextView(this@MainActivity).apply {
-                textSize = 12f
+                textSize = UiConstants.Text.CAPTION
                 text = subtitle
-                setTextColor(0xFF9A9A9A.toInt())
+                setTextColor(UiConstants.Colors.TEXT_SECONDARY)
             }
 
             textColumn.addView(titleView)
@@ -832,8 +877,13 @@ class MainActivity : ComponentActivity() {
     ): LinearLayout {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(12, 12, 12, 12)
-            setBackgroundColor(0xFF1A1A1A.toInt())
+            setPadding(
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING
+            )
+            setBackgroundColor(UiConstants.Colors.SURFACE)
         }
 
         val leftToRight = Button(this).apply {
@@ -859,7 +909,7 @@ class MainActivity : ComponentActivity() {
         }
 
         row.addView(leftToRight)
-        row.addView(space(6))
+        row.addView(space(UiConstants.Spacing.TINY_GAP))
         row.addView(rightToLeft)
         return row
     }
@@ -870,8 +920,8 @@ class MainActivity : ComponentActivity() {
         prefs: android.content.SharedPreferences
     ) {
         val bounds = getTrackpadSizeBounds()
-        val width = prefs.getInt("${fromPrefix}_width", dp(200))
-        val height = prefs.getInt("${fromPrefix}_height", dp(200))
+        val width = prefs.getInt("${fromPrefix}_width", dp(UiConstants.Sizes.DEFAULT_TRACKPAD_SIZE))
+        val height = prefs.getInt("${fromPrefix}_height", dp(UiConstants.Sizes.DEFAULT_TRACKPAD_SIZE))
         val clampedWidth = width.coerceIn(bounds.minPx, bounds.maxWidthPx)
         val clampedHeight = height.coerceIn(bounds.minPx, bounds.maxHeightPx)
         prefs.edit()
@@ -921,7 +971,7 @@ class MainActivity : ComponentActivity() {
     )
 
     private fun getTrackpadSizeBounds(): TrackpadSizeBounds {
-        val minPx = dp(120)
+        val minPx = dp(UiConstants.Sizes.TRACKPAD_MIN)
         val dm = getSystemService(DISPLAY_SERVICE) as DisplayManager
         val secondary = dm.displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
         val metrics = android.util.DisplayMetrics()
@@ -938,8 +988,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun getButtonSizeBounds(): ButtonSizeBounds {
-        val minPx = dp(24)
-        val maxPx = dp(120)
+        val minPx = dp(UiConstants.Sizes.BUTTON_MIN)
+        val maxPx = dp(UiConstants.Sizes.BUTTON_MAX)
         return ButtonSizeBounds(minPx, maxPx)
     }
 
@@ -948,7 +998,7 @@ class MainActivity : ComponentActivity() {
         val posPrefs = getSharedPreferences("floating_positions", MODE_PRIVATE)
         val mirrorPrefs = getSharedPreferences("mirror_positions", MODE_PRIVATE)
         val root = JSONObject().apply {
-            put("version", 1)
+            put("version", UiConstants.Backup.VERSION)
             put("ui_config", prefsToJson(uiPrefs))
             put("floating_positions", prefsToJson(posPrefs))
             put("mirror_positions", prefsToJson(mirrorPrefs))
@@ -1029,7 +1079,7 @@ class MainActivity : ComponentActivity() {
         editor.apply()
     }
 
-    private fun buildOptionsContainer(paddingTopDp: Int = 8): LinearLayout {
+    private fun buildOptionsContainer(paddingTopDp: Int = UiConstants.Spacing.OPTIONS_TOP): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             visibility = LinearLayout.GONE
@@ -1048,7 +1098,7 @@ class MainActivity : ComponentActivity() {
         header: LinearLayout,
         items: List<ToggleSpec>,
         prefs: android.content.SharedPreferences,
-        paddingTopDp: Int = 6
+        paddingTopDp: Int = UiConstants.Spacing.SUBGROUP_TOP
     ): LinearLayout {
         val options = buildOptionsContainer(paddingTopDp)
         for (item in items) {
@@ -1086,15 +1136,23 @@ class MainActivity : ComponentActivity() {
     ): ToggleRow {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(12, 12, 12, 12)
-            setBackgroundColor(0xFF1A1A1A.toInt())
+            setPadding(
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING
+            )
+            setBackgroundColor(UiConstants.Colors.SURFACE)
         }
 
         val iconView = ImageView(this).apply {
             setImageResource(icon)
-            setColorFilter(0xFFE0E0E0.toInt())
-            layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply {
-                marginEnd = dp(12)
+            setColorFilter(UiConstants.Colors.TEXT_PRIMARY)
+            layoutParams = LinearLayout.LayoutParams(
+                dp(UiConstants.Sizes.ICON),
+                dp(UiConstants.Sizes.ICON)
+            ).apply {
+                marginEnd = dp(UiConstants.Spacing.ICON_MARGIN)
             }
         }
         val shouldFlip = flipIcon ?: (key == "show_trackpad_left")
@@ -1103,16 +1161,16 @@ class MainActivity : ComponentActivity() {
         }
 
         val text = TextView(this).apply {
-            textSize = 15f
+            textSize = UiConstants.Text.BODY
             text = label
-            setTextColor(0xFFE0E0E0.toInt())
+            setTextColor(UiConstants.Colors.TEXT_PRIMARY)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
         val toggle = Switch(this).apply {
             isChecked = prefs.getBoolean(key, true)
-            val enabledColor = android.content.res.ColorStateList.valueOf(0xFF9A9A9A.toInt())
-            val disabledColor = android.content.res.ColorStateList.valueOf(0xFF000000.toInt())
+            val enabledColor = android.content.res.ColorStateList.valueOf(UiConstants.Colors.TEXT_SECONDARY)
+            val disabledColor = android.content.res.ColorStateList.valueOf(UiConstants.Colors.BLACK)
             thumbTintList = if (isChecked) enabledColor else disabledColor
             trackTintList = if (isChecked) enabledColor else disabledColor
             setOnCheckedChangeListener { _, isChecked ->
@@ -1133,7 +1191,7 @@ class MainActivity : ComponentActivity() {
         row.addView(iconView)
         row.addView(text)
         row.addView(toggle)
-        row.addView(space(4))
+        row.addView(space(UiConstants.Spacing.ROW_END_GAP))
         return ToggleRow(row, toggle)
     }
 
@@ -1144,8 +1202,13 @@ class MainActivity : ComponentActivity() {
     ): LinearLayout {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(12, 12, 12, 12)
-            setBackgroundColor(0xFF1A1A1A.toInt())
+            setPadding(
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING
+            )
+            setBackgroundColor(UiConstants.Colors.SURFACE)
         }
 
         val top = LinearLayout(this).apply {
@@ -1153,22 +1216,22 @@ class MainActivity : ComponentActivity() {
         }
 
         val text = TextView(this).apply {
-            textSize = 15f
+            textSize = UiConstants.Text.BODY
             text = label
-            setTextColor(0xFFE0E0E0.toInt())
+            setTextColor(UiConstants.Colors.TEXT_PRIMARY)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
         val value = TextView(this).apply {
-            textSize = 13f
-            setTextColor(0xFF9A9A9A.toInt())
+            textSize = UiConstants.Text.SUBTITLE
+            setTextColor(UiConstants.Colors.TEXT_SECONDARY)
         }
 
         val slider = SeekBar(this).apply {
-            max = 100
-            progress = prefs.getInt(key, 100)
+            max = UiConstants.Sliders.OPACITY_MAX
+            progress = prefs.getInt(key, UiConstants.Sliders.OPACITY_DEFAULT)
             value.text = "${progress}%"
-            val gray = android.content.res.ColorStateList.valueOf(0xFF9A9A9A.toInt())
+            val gray = android.content.res.ColorStateList.valueOf(UiConstants.Colors.TEXT_SECONDARY)
             progressTintList = gray
             thumbTintList = gray
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -1199,8 +1262,13 @@ class MainActivity : ComponentActivity() {
     ): LinearLayout {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(12, 12, 12, 12)
-            setBackgroundColor(0xFF1A1A1A.toInt())
+            setPadding(
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING
+            )
+            setBackgroundColor(UiConstants.Colors.SURFACE)
         }
 
         val top = LinearLayout(this).apply {
@@ -1208,34 +1276,37 @@ class MainActivity : ComponentActivity() {
         }
 
         val text = TextView(this).apply {
-            textSize = 15f
+            textSize = UiConstants.Text.BODY
             text = label
-            setTextColor(0xFFE0E0E0.toInt())
+            setTextColor(UiConstants.Colors.TEXT_PRIMARY)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
         val iconView = ImageView(this).apply {
             setImageResource(icon)
-            setColorFilter(0xFFE0E0E0.toInt())
-            layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply {
-                marginEnd = dp(8)
-                topMargin = dp(2)
+            setColorFilter(UiConstants.Colors.TEXT_PRIMARY)
+            layoutParams = LinearLayout.LayoutParams(
+                dp(UiConstants.Sizes.ICON_SMALL),
+                dp(UiConstants.Sizes.ICON_SMALL)
+            ).apply {
+                marginEnd = dp(UiConstants.Spacing.SMALL_GAP)
+                topMargin = dp(UiConstants.Spacing.ICON_TOP_MARGIN)
             }
         }
 
         val value = TextView(this).apply {
-            textSize = 13f
-            setTextColor(0xFF9A9A9A.toInt())
+            textSize = UiConstants.Text.SUBTITLE
+            setTextColor(UiConstants.Colors.TEXT_SECONDARY)
         }
 
-        val steps = 100
+        val steps = UiConstants.Sliders.STEPS
         val slider = SeekBar(this).apply {
             max = steps
             val stored = prefs.getFloat(key, defaultValue).coerceIn(minValue, maxValue)
             val progressValue = ((stored - minValue) / (maxValue - minValue) * steps).roundToInt()
             progress = progressValue
             value.text = String.format("%.1f", stored)
-            val gray = android.content.res.ColorStateList.valueOf(0xFF9A9A9A.toInt())
+            val gray = android.content.res.ColorStateList.valueOf(UiConstants.Colors.TEXT_SECONDARY)
             progressTintList = gray
             thumbTintList = gray
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -1269,8 +1340,13 @@ class MainActivity : ComponentActivity() {
     ): LinearLayout {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(12, 12, 12, 12)
-            setBackgroundColor(0xFF1A1A1A.toInt())
+            setPadding(
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING,
+                UiConstants.Spacing.ROW_PADDING
+            )
+            setBackgroundColor(UiConstants.Colors.SURFACE)
         }
 
         val top = LinearLayout(this).apply {
@@ -1278,24 +1354,27 @@ class MainActivity : ComponentActivity() {
         }
 
         val text = TextView(this).apply {
-            textSize = 15f
+            textSize = UiConstants.Text.BODY
             text = label
-            setTextColor(0xFFE0E0E0.toInt())
+            setTextColor(UiConstants.Colors.TEXT_PRIMARY)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
         val iconView = ImageView(this).apply {
             setImageResource(icon)
-            setColorFilter(0xFFE0E0E0.toInt())
-            layoutParams = LinearLayout.LayoutParams(dp(20), dp(20)).apply {
-                marginEnd = dp(8)
-                topMargin = dp(2)
+            setColorFilter(UiConstants.Colors.TEXT_PRIMARY)
+            layoutParams = LinearLayout.LayoutParams(
+                dp(UiConstants.Sizes.ICON_SMALL),
+                dp(UiConstants.Sizes.ICON_SMALL)
+            ).apply {
+                marginEnd = dp(UiConstants.Spacing.SMALL_GAP)
+                topMargin = dp(UiConstants.Spacing.ICON_TOP_MARGIN)
             }
         }
 
         val value = TextView(this).apply {
-            textSize = 13f
-            setTextColor(0xFF9A9A9A.toInt())
+            textSize = UiConstants.Text.SUBTITLE
+            setTextColor(UiConstants.Colors.TEXT_SECONDARY)
         }
 
         val slider = SeekBar(this).apply {
@@ -1303,7 +1382,7 @@ class MainActivity : ComponentActivity() {
             val stored = prefs.getInt(key, defaultValue).coerceIn(minValue, maxValue)
             progress = stored - minValue
             value.text = stored.toString()
-            val gray = android.content.res.ColorStateList.valueOf(0xFF9A9A9A.toInt())
+            val gray = android.content.res.ColorStateList.valueOf(UiConstants.Colors.TEXT_SECONDARY)
             progressTintList = gray
             thumbTintList = gray
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
