@@ -1,8 +1,6 @@
 package com.example.ayn_thor_bottom_screen_power_tool
 
 import android.accessibilityservice.AccessibilityServiceInfo
-import android.app.ActivityOptions
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.display.DisplayManager
@@ -81,7 +79,7 @@ class MainActivity : ComponentActivity() {
 
         setContentView(scroll)
 
-        val sizePrefs = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
+        val sizePrefs = getSharedPreferences("ui_config", MODE_PRIVATE)
         sizePrefListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             val edit = sizeInputs[key] ?: return@OnSharedPreferenceChangeListener
             if (edit.hasFocus()) return@OnSharedPreferenceChangeListener
@@ -103,7 +101,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         sizePrefListener?.let {
-            getSharedPreferences("ui_config", Context.MODE_PRIVATE)
+            getSharedPreferences("ui_config", MODE_PRIVATE)
                 .unregisterOnSharedPreferenceChangeListener(it)
         }
         sizePrefListener = null
@@ -136,7 +134,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun isPointerA11yEnabled(): Boolean {
-        val am = getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+        val am = getSystemService(ACCESSIBILITY_SERVICE) as AccessibilityManager
         val enabled = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
         return enabled.any { it.resolveInfo.serviceInfo.packageName == packageName &&
                 it.resolveInfo.serviceInfo.name.contains("PointerAccessibilityService") }
@@ -205,7 +203,7 @@ class MainActivity : ComponentActivity() {
 
         // Start cursor overlay service
         startForegroundService(Intent(this, PointerService::class.java))
-        getSharedPreferences("ui_config", Context.MODE_PRIVATE)
+        getSharedPreferences("ui_config", MODE_PRIVATE)
             .edit()
             .putBoolean("overlay_running", true)
             .apply()
@@ -231,7 +229,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun ensureDefaultsFromAsset() {
-        val uiPrefs = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
+        val uiPrefs = getSharedPreferences("ui_config", MODE_PRIVATE)
         if (uiPrefs.getBoolean("defaults_loaded", false)) return
         if (uiPrefs.all.isNotEmpty()) {
             uiPrefs.edit().putBoolean("defaults_loaded", true).apply()
@@ -242,10 +240,10 @@ class MainActivity : ComponentActivity() {
             val root = JSONObject(json)
             root.optJSONObject("ui_config")?.let { applyJsonToPrefs(it, uiPrefs) }
             root.optJSONObject("floating_positions")?.let {
-                applyJsonToPrefs(it, getSharedPreferences("floating_positions", Context.MODE_PRIVATE))
+                applyJsonToPrefs(it, getSharedPreferences("floating_positions", MODE_PRIVATE))
             }
             root.optJSONObject("mirror_positions")?.let {
-                applyJsonToPrefs(it, getSharedPreferences("mirror_positions", Context.MODE_PRIVATE))
+                applyJsonToPrefs(it, getSharedPreferences("mirror_positions", MODE_PRIVATE))
             }
             uiPrefs.edit().putBoolean("defaults_loaded", true).apply()
         } catch (_: Throwable) {
@@ -253,13 +251,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateOverlayButtonState() {
-        val running = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
+        val running = getSharedPreferences("ui_config", MODE_PRIVATE)
             .getBoolean("overlay_running", false)
         if (running) {
             startBtn.text = "Stop Overlay"
             startBtn.setOnClickListener {
                 pendingStart = false
-                getSharedPreferences("ui_config", Context.MODE_PRIVATE)
+                getSharedPreferences("ui_config", MODE_PRIVATE)
                     .edit()
                     .putBoolean("overlay_running", false)
                     .apply()
@@ -278,7 +276,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun buildButtonsMenu(): LinearLayout {
-        val prefs = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("ui_config", MODE_PRIVATE)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
@@ -288,11 +286,7 @@ class MainActivity : ComponentActivity() {
             subtitle = "Floating controls visibility and actions"
         )
 
-        val options = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = LinearLayout.GONE
-            setPadding(0, 8, 0, 0)
-        }
+        val options = buildOptionsContainer()
 
         val trackpadHeader = buildSubgroupHeaderRow(
             title = "Trackpad mode",
@@ -300,35 +294,23 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.trackpad_right,
             flipIcon = true
         )
-        val trackpadOptions = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = LinearLayout.GONE
-            setPadding(0, 6, 0, 0)
-        }
-        trackpadHeader.setOnClickListener {
-            trackpadOptions.visibility =
-                if (trackpadOptions.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
-        }
+        val trackpadOptions = buildToggleSection(trackpadHeader, listOf(
+            ToggleSpec("show_nav_buttons", "Floating navigation toggle button", android.R.drawable.ic_menu_manage),
+            ToggleSpec("show_back_btn", "Back button", R.drawable.ic_back),
+            ToggleSpec("show_home_btn", "Home button", R.drawable.ic_home),
+            ToggleSpec("show_recents_btn", "Recents button", R.drawable.ic_menu),
+            ToggleSpec("show_drag_btn", "Drag toggle button", R.drawable.ic_drag),
+            ToggleSpec("show_stop_btn", "Stop overlay button", android.R.drawable.ic_menu_close_clear_cancel),
+            ToggleSpec("show_hide_btn", "Show/Hide toggle button", R.drawable.ic_eye_open),
+            ToggleSpec("show_swap_btn", "Screen swap button - Experimental use at your own risk to be fixed in future", R.drawable.ic_swap),
+            ToggleSpec("show_light_btn", "Light overlay toggle button", R.drawable.ic_light_bulb),
+            ToggleSpec("show_mirror_btn", "Mirror mode toggle button", R.drawable.ic_mirror),
+            ToggleSpec("show_click_btn", "Click button", R.drawable.ic_trackpad_click),
+            ToggleSpec("show_right_click_btn", "Right-click button", R.drawable.ic_trackpad_right_click),
+            ToggleSpec("show_trackpad_left", "Left trackpad", R.drawable.trackpad_right, flipIcon = true),
+            ToggleSpec("show_trackpad_right", "Right trackpad", R.drawable.trackpad_right)
+        ), prefs, paddingTopDp = 6)
         options.addView(trackpadHeader)
-        val trackpadItems = listOf(
-            Triple("show_nav_buttons", "Floating navigation toggle button", android.R.drawable.ic_menu_manage),
-            Triple("show_back_btn", "Back button", R.drawable.ic_back),
-            Triple("show_home_btn", "Home button", R.drawable.ic_home),
-            Triple("show_recents_btn", "Recents button", R.drawable.ic_menu),
-            Triple("show_drag_btn", "Drag toggle button", R.drawable.ic_drag),
-            Triple("show_stop_btn", "Stop overlay button", android.R.drawable.ic_menu_close_clear_cancel),
-            Triple("show_hide_btn", "Show/Hide toggle button", R.drawable.ic_eye_open),
-            Triple("show_swap_btn", "Screen swap button - Experimental use at your own risk to be fixed in future", R.drawable.ic_swap),
-            Triple("show_light_btn", "Light overlay toggle button", R.drawable.ic_light_bulb),
-            Triple("show_mirror_btn", "Mirror mode toggle button", R.drawable.ic_mirror),
-            Triple("show_click_btn", "Click button", R.drawable.ic_trackpad_click),
-            Triple("show_right_click_btn", "Right-click button", R.drawable.ic_trackpad_right_click),
-            Triple("show_trackpad_left", "Left trackpad", R.drawable.trackpad_right),
-            Triple("show_trackpad_right", "Right trackpad", R.drawable.trackpad_right)
-        )
-        for ((key, label, icon) in trackpadItems) {
-            trackpadOptions.addView(buildToggleRow(label, key, icon, prefs))
-        }
         options.addView(trackpadOptions)
 
         options.addView(space(8))
@@ -338,32 +320,17 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.ic_mirror,
             flipIcon = false
         )
-        val mirrorOptions = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = LinearLayout.GONE
-            setPadding(0, 6, 0, 0)
-        }
-        mirrorHeader.setOnClickListener {
-            mirrorOptions.visibility =
-                if (mirrorOptions.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
-        }
+        val mirrorOptions = buildToggleSection(mirrorHeader, listOf(
+            ToggleSpec("mirror_show_toggle", "Toggle mirror mode", R.drawable.ic_mirror),
+            ToggleSpec("mirror_show_recents", "Recents button", R.drawable.ic_menu),
+            ToggleSpec("mirror_show_back", "Back button", R.drawable.ic_back),
+            ToggleSpec("mirror_show_home", "Home button", R.drawable.ic_home),
+            ToggleSpec("mirror_show_drag", "Drag toggle button", R.drawable.ic_drag)
+        ), prefs, paddingTopDp = 6)
         options.addView(mirrorHeader)
-        val mirrorItems = listOf(
-            Triple("mirror_show_toggle", "Toggle mirror mode", R.drawable.ic_mirror),
-            Triple("mirror_show_recents", "Recents button", R.drawable.ic_menu),
-            Triple("mirror_show_back", "Back button", R.drawable.ic_back),
-            Triple("mirror_show_home", "Home button", R.drawable.ic_home),
-            Triple("mirror_show_drag", "Drag toggle button", R.drawable.ic_drag)
-        )
-        for ((key, label, icon) in mirrorItems) {
-            mirrorOptions.addView(buildToggleRow(label, key, icon, prefs))
-        }
         options.addView(mirrorOptions)
 
-        sectionHeader.setOnClickListener {
-            options.visibility =
-                if (options.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
-        }
+        toggleVisibilityOnClick(sectionHeader, options)
 
         container.addView(sectionHeader)
         container.addView(options)
@@ -435,7 +402,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun buildOpacityMenu(): LinearLayout {
-        val prefs = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("ui_config", MODE_PRIVATE)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
@@ -445,19 +412,12 @@ class MainActivity : ComponentActivity() {
             subtitle = "Default transparency for overlays"
         )
 
-        val options = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = LinearLayout.GONE
-            setPadding(0, 8, 0, 0)
-        }
+        val options = buildOptionsContainer()
 
         options.addView(buildSliderRow("Button opacity", "button_opacity", prefs))
         options.addView(buildSliderRow("Trackpad opacity", "trackpad_opacity", prefs))
 
-        sectionHeader.setOnClickListener {
-            options.visibility =
-                if (options.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
-        }
+        toggleVisibilityOnClick(sectionHeader, options)
 
         container.addView(sectionHeader)
         container.addView(options)
@@ -465,7 +425,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun buildTrackpadSizeMenu(): LinearLayout {
-        val prefs = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("ui_config", MODE_PRIVATE)
         val bounds = getTrackpadSizeBounds()
         val buttonBounds = getButtonSizeBounds()
         val container = LinearLayout(this).apply {
@@ -477,11 +437,7 @@ class MainActivity : ComponentActivity() {
             subtitle = "Set width and height for each trackpad"
         )
 
-        val options = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = LinearLayout.GONE
-            setPadding(0, 8, 0, 0)
-        }
+        val options = buildOptionsContainer()
 
         options.addView(buildGroupHeaderRow("Left trackpad", R.drawable.trackpad_right, flipIcon = true))
         options.addView(buildNumberInputRow("Width", "trackpad_left_width", prefs, bounds.minPx, bounds.maxWidthPx))
@@ -499,10 +455,7 @@ class MainActivity : ComponentActivity() {
         options.addView(buildGroupHeaderRow("Buttons", R.drawable.ic_menu, flipIcon = false))
         options.addView(buildNumberInputRow("Button size", "button_size", prefs, buttonBounds.minPx, buttonBounds.maxPx))
 
-        sectionHeader.setOnClickListener {
-            options.visibility =
-                if (options.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
-        }
+        toggleVisibilityOnClick(sectionHeader, options)
 
         container.addView(sectionHeader)
         container.addView(options)
@@ -510,7 +463,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun buildBehaviorMenu(): LinearLayout {
-        val prefs = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences("ui_config", MODE_PRIVATE)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
@@ -520,11 +473,7 @@ class MainActivity : ComponentActivity() {
             subtitle = "Focus and cursor tuning"
         )
 
-        val options = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = LinearLayout.GONE
-            setPadding(0, 8, 0, 0)
-        }
+        val options = buildOptionsContainer()
 
         options.addView(buildToggleRow(
             label = "Auto focus primary screen on touch",
@@ -538,15 +487,8 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.trackpad_right,
             flipIcon = true
         )
-        val trackpadOptions = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = LinearLayout.GONE
-            setPadding(0, 6, 0, 0)
-        }
-        trackpadHeader.setOnClickListener {
-            trackpadOptions.visibility =
-                if (trackpadOptions.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
-        }
+        val trackpadOptions = buildOptionsContainer(paddingTopDp = 6)
+        toggleVisibilityOnClick(trackpadHeader, trackpadOptions)
         trackpadOptions.addView(buildFloatSliderRow(
             label = "Cursor sensitivity",
             key = "cursor_sensitivity",
@@ -581,15 +523,8 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.ic_trackpad_click,
             flipIcon = false
         )
-        val trackpadModeOptions = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = LinearLayout.GONE
-            setPadding(0, 6, 0, 0)
-        }
-        trackpadModeHeader.setOnClickListener {
-            trackpadModeOptions.visibility =
-                if (trackpadModeOptions.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
-        }
+        val trackpadModeOptions = buildOptionsContainer(paddingTopDp = 6)
+        toggleVisibilityOnClick(trackpadModeHeader, trackpadModeOptions)
         trackpadModeOptions.addView(buildToggleRow(
             label = "Click button hold for a right-click",
             key = "click_hold_right_click",
@@ -609,15 +544,8 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.ic_light_bulb,
             flipIcon = false
         )
-        val lightOffOptions = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = LinearLayout.GONE
-            setPadding(0, 6, 0, 0)
-        }
-        lightOffHeader.setOnClickListener {
-            lightOffOptions.visibility =
-                if (lightOffOptions.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
-        }
+        val lightOffOptions = buildOptionsContainer(paddingTopDp = 6)
+        toggleVisibilityOnClick(lightOffHeader, lightOffOptions)
         lightOffOptions.addView(buildToggleRow(
             label = "Keep controller element ON when Light Off",
             key = "light_off_keep_controls",
@@ -625,27 +553,27 @@ class MainActivity : ComponentActivity() {
             prefs = prefs
         ))
         var syncPrimaryEnabled: (() -> Unit)? = null
-        val hideBottomRow = buildToggleRow(
+        val hideBottomRow = buildToggleRowWithSwitch(
             label = "Hide bottom screen light bulb button when light off",
             key = "light_off_hide_bottom_button",
             icon = R.drawable.ic_light_bulb,
             prefs = prefs,
             onCheckedChange = { syncPrimaryEnabled?.invoke() }
         )
-        val showPrimaryRow = buildToggleRow(
+        val showPrimaryRow = buildToggleRowWithSwitch(
             label = "Show light bulb button on primary screen when light off",
             key = "light_off_primary_button",
             icon = R.drawable.ic_light_bulb,
             prefs = prefs
         )
-        lightOffOptions.addView(hideBottomRow)
-        lightOffOptions.addView(showPrimaryRow)
-        val hideSwitch = hideBottomRow.getChildAt(2) as? Switch
-        val primarySwitch = showPrimaryRow.getChildAt(2) as? Switch
+        lightOffOptions.addView(hideBottomRow.row)
+        lightOffOptions.addView(showPrimaryRow.row)
+        val hideSwitch = hideBottomRow.toggle
+        val primarySwitch = showPrimaryRow.toggle
         syncPrimaryEnabled = {
-            val hideBottom = hideSwitch?.isChecked == true
-            primarySwitch?.isEnabled = hideBottom
-            if (!hideBottom && primarySwitch?.isChecked == true) {
+            val hideBottom = hideSwitch.isChecked
+            primarySwitch.isEnabled = hideBottom
+            if (!hideBottom && primarySwitch.isChecked) {
                 primarySwitch.isChecked = false
                 prefs.edit().putBoolean("light_off_primary_button", false).apply()
             }
@@ -658,15 +586,8 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.ic_haptic_feedback,
             flipIcon = false
         )
-        val hapticOptions = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = LinearLayout.GONE
-            setPadding(0, 6, 0, 0)
-        }
-        hapticHeader.setOnClickListener {
-            hapticOptions.visibility =
-                if (hapticOptions.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
-        }
+        val hapticOptions = buildOptionsContainer(paddingTopDp = 6)
+        toggleVisibilityOnClick(hapticHeader, hapticOptions)
         hapticOptions.addView(buildToggleRow(
             label = "Button haptic feedback",
             key = "haptic_button_press",
@@ -692,15 +613,8 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.ic_mirror,
             flipIcon = false
         )
-        val mirrorOptions = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = LinearLayout.GONE
-            setPadding(0, 6, 0, 0)
-        }
-        mirrorHeader.setOnClickListener {
-            mirrorOptions.visibility =
-                if (mirrorOptions.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
-        }
+        val mirrorOptions = buildOptionsContainer(paddingTopDp = 6)
+        toggleVisibilityOnClick(mirrorHeader, mirrorOptions)
         mirrorOptions.addView(buildToggleRow(
             label = "Button haptic feedback",
             key = "haptic_mirror_buttons",
@@ -729,10 +643,7 @@ class MainActivity : ComponentActivity() {
         options.addView(mirrorHeader)
         options.addView(mirrorOptions)
 
-        sectionHeader.setOnClickListener {
-            options.visibility =
-                if (options.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
-        }
+        toggleVisibilityOnClick(sectionHeader, options)
 
         container.addView(sectionHeader)
         container.addView(options)
@@ -749,11 +660,7 @@ class MainActivity : ComponentActivity() {
             subtitle = "Save or restore overlay configuration"
         )
 
-        val options = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            visibility = LinearLayout.GONE
-            setPadding(0, 8, 0, 0)
-        }
+        val options = buildOptionsContainer()
 
         val backupBtn = Button(this).apply {
             text = "Backup settings"
@@ -773,10 +680,7 @@ class MainActivity : ComponentActivity() {
         options.addView(space(6))
         options.addView(importBtn)
 
-        sectionHeader.setOnClickListener {
-            options.visibility =
-                if (options.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
-        }
+        toggleVisibilityOnClick(sectionHeader, options)
 
         container.addView(sectionHeader)
         container.addView(options)
@@ -993,6 +897,18 @@ class MainActivity : ComponentActivity() {
         prefs.edit().putInt(key, clamped).apply()
     }
 
+    private data class ToggleSpec(
+        val key: String,
+        val label: String,
+        val icon: Int,
+        val flipIcon: Boolean? = null
+    )
+
+    private data class ToggleRow(
+        val row: LinearLayout,
+        val toggle: Switch
+    )
+
     private data class TrackpadSizeBounds(
         val minPx: Int,
         val maxWidthPx: Int,
@@ -1006,7 +922,7 @@ class MainActivity : ComponentActivity() {
 
     private fun getTrackpadSizeBounds(): TrackpadSizeBounds {
         val minPx = dp(120)
-        val dm = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        val dm = getSystemService(DISPLAY_SERVICE) as DisplayManager
         val secondary = dm.displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
         val metrics = android.util.DisplayMetrics()
         if (secondary != null) {
@@ -1028,9 +944,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun exportSettingsToUri(uri: Uri) {
-        val uiPrefs = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
-        val posPrefs = getSharedPreferences("floating_positions", Context.MODE_PRIVATE)
-        val mirrorPrefs = getSharedPreferences("mirror_positions", Context.MODE_PRIVATE)
+        val uiPrefs = getSharedPreferences("ui_config", MODE_PRIVATE)
+        val posPrefs = getSharedPreferences("floating_positions", MODE_PRIVATE)
+        val mirrorPrefs = getSharedPreferences("mirror_positions", MODE_PRIVATE)
         val root = JSONObject().apply {
             put("version", 1)
             put("ui_config", prefsToJson(uiPrefs))
@@ -1053,9 +969,9 @@ class MainActivity : ComponentActivity() {
                 stream.readBytes().toString(Charsets.UTF_8)
             } ?: return
             val root = JSONObject(content)
-            val uiPrefs = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
-            val posPrefs = getSharedPreferences("floating_positions", Context.MODE_PRIVATE)
-            val mirrorPrefs = getSharedPreferences("mirror_positions", Context.MODE_PRIVATE)
+            val uiPrefs = getSharedPreferences("ui_config", MODE_PRIVATE)
+            val posPrefs = getSharedPreferences("floating_positions", MODE_PRIVATE)
+            val mirrorPrefs = getSharedPreferences("mirror_positions", MODE_PRIVATE)
             if (root.has("ui_config")) {
                 applyJsonToPrefs(root.getJSONObject("ui_config"), uiPrefs)
             }
@@ -1095,8 +1011,7 @@ class MainActivity : ComponentActivity() {
         val keys = obj.keys()
         while (keys.hasNext()) {
             val key = keys.next()
-            val value = obj.get(key)
-            when (value) {
+            when (val value = obj.get(key)) {
                 is Boolean -> editor.putBoolean(key, value)
                 is Int -> editor.putInt(key, value)
                 is Long -> editor.putLong(key, value)
@@ -1114,13 +1029,61 @@ class MainActivity : ComponentActivity() {
         editor.apply()
     }
 
+    private fun buildOptionsContainer(paddingTopDp: Int = 8): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = LinearLayout.GONE
+            setPadding(0, paddingTopDp, 0, 0)
+        }
+    }
+
+    private fun toggleVisibilityOnClick(header: android.view.View, options: android.view.View) {
+        header.setOnClickListener {
+            options.visibility =
+                if (options.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
+        }
+    }
+
+    private fun buildToggleSection(
+        header: LinearLayout,
+        items: List<ToggleSpec>,
+        prefs: android.content.SharedPreferences,
+        paddingTopDp: Int = 6
+    ): LinearLayout {
+        val options = buildOptionsContainer(paddingTopDp)
+        for (item in items) {
+            options.addView(buildToggleRow(item.label, item.key, item.icon, prefs, flipIcon = item.flipIcon))
+        }
+        toggleVisibilityOnClick(header, options)
+        return options
+    }
+
     private fun buildToggleRow(
         label: String,
         key: String,
         icon: Int,
         prefs: android.content.SharedPreferences,
-        onCheckedChange: ((Boolean) -> Unit)? = null
+        onCheckedChange: ((Boolean) -> Unit)? = null,
+        flipIcon: Boolean? = null
     ): LinearLayout {
+        return buildToggleRowWithSwitch(
+            label = label,
+            key = key,
+            icon = icon,
+            prefs = prefs,
+            onCheckedChange = onCheckedChange,
+            flipIcon = flipIcon
+        ).row
+    }
+
+    private fun buildToggleRowWithSwitch(
+        label: String,
+        key: String,
+        icon: Int,
+        prefs: android.content.SharedPreferences,
+        onCheckedChange: ((Boolean) -> Unit)? = null,
+        flipIcon: Boolean? = null
+    ): ToggleRow {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(12, 12, 12, 12)
@@ -1134,7 +1097,8 @@ class MainActivity : ComponentActivity() {
                 marginEnd = dp(12)
             }
         }
-        if (key == "show_trackpad_left") {
+        val shouldFlip = flipIcon ?: (key == "show_trackpad_left")
+        if (shouldFlip) {
             iconView.scaleX = -1f
         }
 
@@ -1170,7 +1134,7 @@ class MainActivity : ComponentActivity() {
         row.addView(text)
         row.addView(toggle)
         row.addView(space(4))
-        return row
+        return ToggleRow(row, toggle)
     }
 
     private fun buildSliderRow(
