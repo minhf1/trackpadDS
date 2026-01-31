@@ -1,6 +1,7 @@
 package com.example.ayn_thor_bottom_screen_power_tool
 
 object UiConstants {
+    // Spacing values are dp unless otherwise noted.
     object Spacing {
         const val SCREEN_PADDING = 32
         const val SECTION_GAP = 16
@@ -16,6 +17,7 @@ object UiConstants {
         const val ICON_TOP_MARGIN = 2
     }
 
+    // Text sizes are sp.
     object Text {
         const val TITLE = 18f
         const val SECTION = 16f
@@ -25,6 +27,7 @@ object UiConstants {
         const val CAPTION = 12f
     }
 
+    // Colors are ARGB.
     object Colors {
         const val BLACK = 0xFF000000.toInt()
         const val WHITE = 0xFFFFFFFF.toInt()
@@ -38,6 +41,7 @@ object UiConstants {
         const val BANNER_BG = 0xFF141414.toInt()
     }
 
+    // Sizes are dp unless otherwise noted.
     object Sizes {
         const val ICON_SMALL = 20
         const val ICON = 24
@@ -51,6 +55,7 @@ object UiConstants {
         const val DEFAULT_TRACKPAD_SIZE = 200
     }
 
+    // Slider bounds/defaults used by settings UI.
     object Sliders {
         const val OPACITY_MAX = 100
         const val OPACITY_DEFAULT = 100
@@ -69,6 +74,7 @@ object UiConstants {
         const val CURSOR_FADE_DEFAULT_MS = 1000
     }
 
+    // Backup file format version for settings export/import.
     object Backup {
         const val VERSION = 1
     }

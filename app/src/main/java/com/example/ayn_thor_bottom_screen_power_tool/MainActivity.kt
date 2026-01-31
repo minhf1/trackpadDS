@@ -54,10 +54,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // onCreate.
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ensureDefaultsFromAsset()
 
+        // Root container and global padding/theme colors.
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(
@@ -84,6 +86,7 @@ class MainActivity : ComponentActivity() {
         root.addView(space(UiConstants.Spacing.SMALL_GAP))
         root.addView(buildButtonsMenu())
 
+        // Scroll container for the entire settings UI.
         val scroll = ScrollView(this).apply {
             setBackgroundColor(UiConstants.Colors.BLACK)
             addView(root)
@@ -103,6 +106,7 @@ class MainActivity : ComponentActivity() {
         sizePrefs.registerOnSharedPreferenceChangeListener(sizePrefListener)
     }
 
+    // onResume.
     override fun onResume() {
         super.onResume()
         updateOverlayButtonState()
@@ -111,6 +115,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // onDestroy.
     override fun onDestroy() {
         sizePrefListener?.let {
             getSharedPreferences("ui_config", MODE_PRIVATE)
@@ -120,6 +125,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
+    // requestOverlayPermission.
     private fun requestOverlayPermission() {
         if (!Settings.canDrawOverlays(this)) {
             val intent = Intent(
@@ -130,10 +136,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // openAccessibilitySettings.
     private fun openAccessibilitySettings() {
         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
     }
 
+    // isPointerA11yEnabled.
     private fun isPointerA11yEnabled(): Boolean {
         val am = getSystemService(ACCESSIBILITY_SERVICE) as AccessibilityManager
         val enabled = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
@@ -141,12 +149,14 @@ class MainActivity : ComponentActivity() {
                 it.resolveInfo.serviceInfo.name.contains("PointerAccessibilityService") }
     }
 
+    // buildPermissionNotice.
     private fun buildPermissionNotice(): LinearLayout? {
         val overlayMissing = !Settings.canDrawOverlays(this)
         val a11yMissing = !isPointerA11yEnabled()
         val notifMissing = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         if (!overlayMissing && !a11yMissing && !notifMissing) return null
 
+        // Simple permission explainer card shown only when something is missing.
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(
@@ -189,6 +199,7 @@ class MainActivity : ComponentActivity() {
         return container
     }
 
+    // proceedStartFlow.
     private fun proceedStartFlow() {
         if (!Settings.canDrawOverlays(this)) {
             requestOverlayPermission()
@@ -231,6 +242,7 @@ class MainActivity : ComponentActivity() {
 //        }
     }
 
+    // ensureDefaultsFromAsset.
     private fun ensureDefaultsFromAsset() {
         val uiPrefs = getSharedPreferences("ui_config", MODE_PRIVATE)
         if (uiPrefs.getBoolean("defaults_loaded", false)) return
@@ -253,6 +265,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // updateOverlayButtonState.
     private fun updateOverlayButtonState() {
         val running = getSharedPreferences("ui_config", MODE_PRIVATE)
             .getBoolean("overlay_running", false)
@@ -278,12 +291,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // buildButtonsMenu.
     private fun buildButtonsMenu(): LinearLayout {
         val prefs = getSharedPreferences("ui_config", MODE_PRIVATE)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
 
+        // Top-level section and nested subgroups for button visibility.
         val sectionHeader = buildSectionHeader(
             title = "Buttons",
             subtitle = "Floating controls visibility and actions"
@@ -348,6 +363,7 @@ class MainActivity : ComponentActivity() {
         return container
     }
 
+    // buildKofiBanner.
     private fun buildKofiBanner(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -364,6 +380,7 @@ class MainActivity : ComponentActivity() {
                 startActivity(Intent(Intent.ACTION_VIEW, uri))
             }
 
+            // Banner text and image.
             val textView = TextView(context).apply {
                 text = "Buy me coffee if you love the app"
                 textSize = UiConstants.Text.BANNER
@@ -394,6 +411,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // buildSectionHeader.
     private fun buildSectionHeader(title: String, subtitle: String): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -404,6 +422,7 @@ class MainActivity : ComponentActivity() {
                 UiConstants.Spacing.CARD_PADDING
             )
             setBackgroundColor(UiConstants.Colors.SURFACE_DARK)
+            // Title + subtitle stack for a section header.
             addView(TextView(context).apply {
                 text = title
                 textSize = UiConstants.Text.TITLE
@@ -417,12 +436,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // buildOpacityMenu.
     private fun buildOpacityMenu(): LinearLayout {
         val prefs = getSharedPreferences("ui_config", MODE_PRIVATE)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
 
+        // Opacity sliders are percentage-based.
         val sectionHeader = buildSectionHeader(
             title = "Opacity",
             subtitle = "Default transparency for overlays"
@@ -440,6 +461,7 @@ class MainActivity : ComponentActivity() {
         return container
     }
 
+    // buildTrackpadSizeMenu.
     private fun buildTrackpadSizeMenu(): LinearLayout {
         val prefs = getSharedPreferences("ui_config", MODE_PRIVATE)
         val bounds = getTrackpadSizeBounds()
@@ -478,12 +500,14 @@ class MainActivity : ComponentActivity() {
         return container
     }
 
+    // buildBehaviorMenu.
     private fun buildBehaviorMenu(): LinearLayout {
         val prefs = getSharedPreferences("ui_config", MODE_PRIVATE)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
 
+        // Grouped behavior controls (trackpad, light-off, haptics, mirror).
         val sectionHeader = buildSectionHeader(
             title = "Behavior",
             subtitle = "Focus and cursor tuning"
@@ -666,11 +690,13 @@ class MainActivity : ComponentActivity() {
         return container
     }
 
+    // buildBackupImportMenu.
     private fun buildBackupImportMenu(): LinearLayout {
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
 
+        // Backup/import uses JSON document picker.
         val sectionHeader = buildSectionHeader(
             title = "Backup and import settings",
             subtitle = "Save or restore overlay configuration"
@@ -703,6 +729,7 @@ class MainActivity : ComponentActivity() {
         return container
     }
 
+    // buildGroupHeaderRow.
     private fun buildGroupHeaderRow(
         label: String,
         icon: Int,
@@ -718,6 +745,7 @@ class MainActivity : ComponentActivity() {
             )
             setBackgroundColor(UiConstants.Colors.SURFACE)
 
+            // Single-line subgroup label with icon.
             val iconView = ImageView(this@MainActivity).apply {
                 setImageResource(icon)
                 setColorFilter(UiConstants.Colors.TEXT_PRIMARY)
@@ -748,6 +776,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // buildNumberInputRow.
     private fun buildNumberInputRow(
         label: String,
         key: String,
@@ -766,6 +795,7 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(UiConstants.Colors.SURFACE)
         }
 
+        // Numeric input with clamped commit on blur or IME action.
         val text = TextView(this).apply {
             textSize = UiConstants.Text.BODY
             text = label
@@ -812,6 +842,7 @@ class MainActivity : ComponentActivity() {
         return row
     }
 
+    // buildSubgroupHeaderRow.
     private fun buildSubgroupHeaderRow(
         title: String,
         subtitle: String,
@@ -828,6 +859,7 @@ class MainActivity : ComponentActivity() {
             )
             setBackgroundColor(UiConstants.Colors.SURFACE_ALT)
 
+            // Subgroup header for collapsible sections.
             val iconView = ImageView(this@MainActivity).apply {
                 setImageResource(icon)
                 setColorFilter(UiConstants.Colors.TEXT_PRIMARY)
@@ -872,6 +904,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // buildSizeCopyButtons.
     private fun buildSizeCopyButtons(
         prefs: android.content.SharedPreferences
     ): LinearLayout {
@@ -886,6 +919,7 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(UiConstants.Colors.SURFACE)
         }
 
+        // Convenience actions to mirror left/right trackpad sizes.
         val leftToRight = Button(this).apply {
             text = "Apply left trackpad size to right"
             setOnClickListener {
@@ -914,6 +948,7 @@ class MainActivity : ComponentActivity() {
         return row
     }
 
+    // copyTrackpadSize.
     private fun copyTrackpadSize(
         fromPrefix: String,
         toPrefix: String,
@@ -932,6 +967,7 @@ class MainActivity : ComponentActivity() {
         sizeInputs["${toPrefix}_height"]?.setText(clampedHeight.toString())
     }
 
+    // commitSizeInput.
     private fun commitSizeInput(
         editText: EditText,
         key: String,
@@ -970,6 +1006,7 @@ class MainActivity : ComponentActivity() {
         val maxPx: Int
     )
 
+    // getTrackpadSizeBounds.
     private fun getTrackpadSizeBounds(): TrackpadSizeBounds {
         val minPx = dp(UiConstants.Sizes.TRACKPAD_MIN)
         val dm = getSystemService(DISPLAY_SERVICE) as DisplayManager
@@ -987,12 +1024,14 @@ class MainActivity : ComponentActivity() {
         return TrackpadSizeBounds(minPx, maxWidth, maxHeight)
     }
 
+    // getButtonSizeBounds.
     private fun getButtonSizeBounds(): ButtonSizeBounds {
         val minPx = dp(UiConstants.Sizes.BUTTON_MIN)
         val maxPx = dp(UiConstants.Sizes.BUTTON_MAX)
         return ButtonSizeBounds(minPx, maxPx)
     }
 
+    // exportSettingsToUri.
     private fun exportSettingsToUri(uri: Uri) {
         val uiPrefs = getSharedPreferences("ui_config", MODE_PRIVATE)
         val posPrefs = getSharedPreferences("floating_positions", MODE_PRIVATE)
@@ -1013,6 +1052,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // importSettingsFromUri.
     private fun importSettingsFromUri(uri: Uri) {
         try {
             val content = contentResolver.openInputStream(uri)?.use { stream ->
@@ -1039,6 +1079,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // prefsToJson.
     private fun prefsToJson(prefs: android.content.SharedPreferences): JSONObject {
         val obj = JSONObject()
         for ((key, value) in prefs.all) {
@@ -1053,6 +1094,7 @@ class MainActivity : ComponentActivity() {
         return obj
     }
 
+    // applyJsonToPrefs.
     private fun applyJsonToPrefs(
         obj: JSONObject,
         prefs: android.content.SharedPreferences
@@ -1079,6 +1121,7 @@ class MainActivity : ComponentActivity() {
         editor.apply()
     }
 
+    // buildOptionsContainer.
     private fun buildOptionsContainer(paddingTopDp: Int = UiConstants.Spacing.OPTIONS_TOP): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1087,6 +1130,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // toggleVisibilityOnClick.
     private fun toggleVisibilityOnClick(header: android.view.View, options: android.view.View) {
         header.setOnClickListener {
             options.visibility =
@@ -1094,12 +1138,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // buildToggleSection.
     private fun buildToggleSection(
         header: LinearLayout,
         items: List<ToggleSpec>,
         prefs: android.content.SharedPreferences,
         paddingTopDp: Int = UiConstants.Spacing.SUBGROUP_TOP
     ): LinearLayout {
+        // Collapsible list of toggle rows bound to preference keys.
         val options = buildOptionsContainer(paddingTopDp)
         for (item in items) {
             options.addView(buildToggleRow(item.label, item.key, item.icon, prefs, flipIcon = item.flipIcon))
@@ -1108,6 +1154,7 @@ class MainActivity : ComponentActivity() {
         return options
     }
 
+    // buildToggleRow.
     private fun buildToggleRow(
         label: String,
         key: String,
@@ -1126,6 +1173,7 @@ class MainActivity : ComponentActivity() {
         ).row
     }
 
+    // buildToggleRowWithSwitch.
     private fun buildToggleRowWithSwitch(
         label: String,
         key: String,
@@ -1145,6 +1193,7 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(UiConstants.Colors.SURFACE)
         }
 
+        // Row with icon, label, and switch tied to a preference key.
         val iconView = ImageView(this).apply {
             setImageResource(icon)
             setColorFilter(UiConstants.Colors.TEXT_PRIMARY)
@@ -1195,6 +1244,7 @@ class MainActivity : ComponentActivity() {
         return ToggleRow(row, toggle)
     }
 
+    // buildSliderRow.
     private fun buildSliderRow(
         label: String,
         key: String,
@@ -1211,6 +1261,7 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(UiConstants.Colors.SURFACE)
         }
 
+        // Percentage slider row.
         val top = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
         }
@@ -1235,11 +1286,14 @@ class MainActivity : ComponentActivity() {
             progressTintList = gray
             thumbTintList = gray
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                // onProgressChanged.
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                     prefs.edit().putInt(key, progress).apply()
                     value.text = "$progress%"
                 }
+                // onStartTrackingTouch.
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+                // onStopTrackingTouch.
                 override fun onStopTrackingTouch(seekBar: SeekBar?) {}
             })
         }
@@ -1251,6 +1305,7 @@ class MainActivity : ComponentActivity() {
         return row
     }
 
+    // buildFloatSliderRow.
     private fun buildFloatSliderRow(
         label: String,
         key: String,
@@ -1271,6 +1326,7 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(UiConstants.Colors.SURFACE)
         }
 
+        // Float slider with fixed step count.
         val top = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
         }
@@ -1310,13 +1366,16 @@ class MainActivity : ComponentActivity() {
             progressTintList = gray
             thumbTintList = gray
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                // onProgressChanged.
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                     val fraction = progress / steps.toFloat()
                     val v = (minValue + (maxValue - minValue) * fraction).coerceIn(minValue, maxValue)
                     prefs.edit().putFloat(key, v).apply()
                     value.text = String.format("%.1f", v)
                 }
+                // onStartTrackingTouch.
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+                // onStopTrackingTouch.
                 override fun onStopTrackingTouch(seekBar: SeekBar?) {}
             })
         }
@@ -1329,6 +1388,7 @@ class MainActivity : ComponentActivity() {
         return row
     }
 
+    // buildIntSliderRow.
     private fun buildIntSliderRow(
         label: String,
         key: String,
@@ -1349,6 +1409,7 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(UiConstants.Colors.SURFACE)
         }
 
+        // Int slider with min/max and display value.
         val top = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
         }
@@ -1386,12 +1447,15 @@ class MainActivity : ComponentActivity() {
             progressTintList = gray
             thumbTintList = gray
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                // onProgressChanged.
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                     val v = (minValue + progress).coerceIn(minValue, maxValue)
                     prefs.edit().putInt(key, v).apply()
                     value.text = v.toString()
                 }
+                // onStartTrackingTouch.
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+                // onStopTrackingTouch.
                 override fun onStopTrackingTouch(seekBar: SeekBar?) {}
             })
         }
@@ -1404,10 +1468,12 @@ class MainActivity : ComponentActivity() {
         return row
     }
 
+    // space.
     private fun space(dp: Int) = TextView(this).apply {
         height = dp
     }
 
+    // dp.
     private fun dp(v: Int): Int {
         return (v * resources.displayMetrics.density).toInt()
     }
