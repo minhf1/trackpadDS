@@ -26,23 +26,35 @@ class MirrorActivity : Activity() {
     private var lockedY = 0f
     private var mirrorDragEnabled = false
     private var mirrorDragButton: ImageButton? = null
+    private var mirrorRenderClick = true
     private var lastRootW = 0
     private var lastRootH = 0
 
+    // onCreate.
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Resolve primary display metrics for touch mapping.
         val dm = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
         val primary = dm.getDisplay(android.view.Display.DEFAULT_DISPLAY)
-        val primaryCtx = createDisplayContext(primary)
-        val primaryMetrics = primaryCtx.resources.displayMetrics
-        primaryW = primaryMetrics.widthPixels
-        primaryH = primaryMetrics.heightPixels
+        if (primary != null) {
+            val primaryCtx = createDisplayContext(primary)
+            val primaryMetrics = primaryCtx.resources.displayMetrics
+            primaryW = primaryMetrics.widthPixels
+            primaryH = primaryMetrics.heightPixels
+        } else {
+            val primaryMetrics = resources.displayMetrics
+            primaryW = primaryMetrics.widthPixels
+            primaryH = primaryMetrics.heightPixels
+        }
 
+        // Root container and prefs that drive mirror behavior.
         val root = FrameLayout(this)
-        val uiPrefs = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
-        mirrorDragEnabled = getSharedPreferences("mirror_positions", Context.MODE_PRIVATE)
-            .getBoolean("drag_enabled", false)
+        val uiPrefs = getSharedPreferences(MirrorConstants.Prefs.UI, Context.MODE_PRIVATE)
+        mirrorRenderClick = uiPrefs.getBoolean(MirrorConstants.Prefs.RENDER_CLICK, true)
+        mirrorDragEnabled = getSharedPreferences(MirrorConstants.Prefs.MIRROR_POSITIONS, Context.MODE_PRIVATE)
+            .getBoolean(MirrorConstants.Prefs.DRAG_ENABLED, false)
+        // Cast container draws a border around the mirrored content.
         val castContainer = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -52,9 +64,10 @@ class MirrorActivity : Activity() {
             }
             foreground = GradientDrawable().apply {
                 setColor(Color.TRANSPARENT)
-                setStroke(dp(2), 0xFF1A1A1A.toInt())
+                setStroke(dp(MirrorConstants.Layout.CAST_BORDER_DP), UiConstants.Colors.CAST_BORDER)
             }
         }
+        // SurfaceView hosts the mirrored frames and forwards touches to the service.
         val surfaceView = SurfaceView(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -62,6 +75,7 @@ class MirrorActivity : Activity() {
             )
             setOnTouchListener { _, event ->
                 if (primaryW <= 0 || primaryH <= 0) return@setOnTouchListener false
+                // Convert screen touch to mirrored content coordinates.
                 val castRect = getCastRect(castContainer)
                 val w = castRect.width().coerceAtLeast(1f)
                 val h = castRect.height().coerceAtLeast(1f)
@@ -75,6 +89,7 @@ class MirrorActivity : Activity() {
                 var y = rawY.coerceIn(0f, (primaryH - 1).coerceAtLeast(0).toFloat())
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
+                        // Lock to edge when touch starts outside the cast area.
                         lockEdgeX = outsideX
                         lockEdgeY = outsideY
                         if (lockEdgeX) {
@@ -85,8 +100,9 @@ class MirrorActivity : Activity() {
                         }
                         if (lockEdgeX) x = lockedX
                         if (lockEdgeY) y = lockedY
+                        // Begin mirrored touch stream.
                         PointerAccessibilityService.instance?.mirrorTouchDown(x, y)
-                        if (uiPrefs.getBoolean("mirror_render_click", true)) {
+                        if (mirrorRenderClick) {
                             PointerService.instance?.updateMirrorTouch(x, y, true)
                         }
                         true
@@ -94,8 +110,9 @@ class MirrorActivity : Activity() {
                     MotionEvent.ACTION_MOVE -> {
                         if (lockEdgeX) x = lockedX
                         if (lockEdgeY) y = lockedY
+                        // Continue mirrored touch stream.
                         PointerAccessibilityService.instance?.mirrorTouchMove(x, y)
-                        if (uiPrefs.getBoolean("mirror_render_click", true)) {
+                        if (mirrorRenderClick) {
                             PointerService.instance?.updateMirrorTouch(x, y, true)
                         }
                         true
@@ -103,8 +120,9 @@ class MirrorActivity : Activity() {
                     MotionEvent.ACTION_UP -> {
                         if (lockEdgeX) x = lockedX
                         if (lockEdgeY) y = lockedY
+                        // End mirrored touch stream.
                         PointerAccessibilityService.instance?.mirrorTouchUp(x, y)
-                        if (uiPrefs.getBoolean("mirror_render_click", true)) {
+                        if (mirrorRenderClick) {
                             PointerService.instance?.updateMirrorTouch(x, y, false)
                         }
                         lockEdgeX = false
@@ -112,8 +130,9 @@ class MirrorActivity : Activity() {
                         true
                     }
                     MotionEvent.ACTION_CANCEL -> {
+                        // Cancel mirrored touch stream.
                         PointerAccessibilityService.instance?.mirrorTouchCancel()
-                        if (uiPrefs.getBoolean("mirror_render_click", true)) {
+                        if (mirrorRenderClick) {
                             PointerService.instance?.updateMirrorTouch(x, y, false)
                         }
                         lockEdgeX = false
@@ -129,6 +148,7 @@ class MirrorActivity : Activity() {
         root.addView(castContainer)
         setContentView(root)
 
+        // Resolve which mirror controls should be visible.
         val showMirrorToggle = uiPrefs.getBoolean("mirror_show_toggle", true)
         val showBack = uiPrefs.getBoolean("mirror_show_back", true)
         val showHome = uiPrefs.getBoolean("mirror_show_home", true)
@@ -136,13 +156,23 @@ class MirrorActivity : Activity() {
         val showDrag = uiPrefs.getBoolean("mirror_show_drag", true)
 
         if (showMirrorToggle) {
-            val mirrorToggle = createMirrorButton(root, "mirror_toggle", R.drawable.ic_mirror, 0) {
+            val mirrorToggle = createMirrorButton(
+                root,
+                MirrorConstants.Keys.MIRROR_TOGGLE,
+                R.drawable.ic_mirror,
+                MirrorConstants.ButtonIndex.TOGGLE
+            ) {
                 finish()
             }
             root.addView(mirrorToggle)
         }
         if (showBack) {
-            val backButton = createMirrorButton(root, "mirror_back", R.drawable.ic_back, 1) {
+            val backButton = createMirrorButton(
+                root,
+                MirrorConstants.Keys.MIRROR_BACK,
+                R.drawable.ic_back,
+                MirrorConstants.ButtonIndex.BACK
+            ) {
                 PointerAccessibilityService.instance?.performGlobalAction(
                     android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK
                 )
@@ -150,7 +180,12 @@ class MirrorActivity : Activity() {
             root.addView(backButton)
         }
         if (showHome) {
-            val homeButton = createMirrorButton(root, "mirror_home", R.drawable.ic_home, 2) {
+            val homeButton = createMirrorButton(
+                root,
+                MirrorConstants.Keys.MIRROR_HOME,
+                R.drawable.ic_home,
+                MirrorConstants.ButtonIndex.HOME
+            ) {
                 PointerAccessibilityService.instance?.performGlobalAction(
                     android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME
                 )
@@ -158,7 +193,12 @@ class MirrorActivity : Activity() {
             root.addView(homeButton)
         }
         if (showRecents) {
-            val recentsButton = createMirrorButton(root, "mirror_recents", R.drawable.ic_menu, 3) {
+            val recentsButton = createMirrorButton(
+                root,
+                MirrorConstants.Keys.MIRROR_RECENTS,
+                R.drawable.ic_menu,
+                MirrorConstants.ButtonIndex.RECENTS
+            ) {
                 PointerAccessibilityService.instance?.performGlobalAction(
                     android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_RECENTS
                 )
@@ -166,7 +206,12 @@ class MirrorActivity : Activity() {
             root.addView(recentsButton)
         }
         if (showDrag) {
-            val dragButton = createMirrorButton(root, "mirror_drag", R.drawable.ic_drag, 4) {
+            val dragButton = createMirrorButton(
+                root,
+                MirrorConstants.Keys.MIRROR_DRAG,
+                R.drawable.ic_drag,
+                MirrorConstants.ButtonIndex.DRAG
+            ) {
                 toggleMirrorDrag()
             }
             mirrorDragButton = dragButton
@@ -174,42 +219,40 @@ class MirrorActivity : Activity() {
         }
         updateMirrorDragAppearance()
 
+        // Attach/detach the mirror surface in the service.
         surfaceView.holder.addCallback(object : android.view.SurfaceHolder.Callback {
+            // surfaceCreated.
             override fun surfaceCreated(holder: android.view.SurfaceHolder) {
                 PointerService.instance?.attachMirrorSurface(holder.surface)
             }
+            // surfaceChanged.
             override fun surfaceChanged(
                 holder: android.view.SurfaceHolder,
                 format: Int,
                 width: Int,
                 height: Int
             ) {}
+            // surfaceDestroyed.
             override fun surfaceDestroyed(holder: android.view.SurfaceHolder) {
                 PointerService.instance?.detachMirrorSurface()
             }
         })
 
+        // Recompute layout/exclusion when size changes.
         root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             maybeUpdateLayout(root, castContainer)
         }
         root.post { maybeUpdateLayout(root, castContainer) }
 
         if (enableGestureExclusion) {
-            root.post {
-                val excludeWidth = dp(32)
-                val rect = android.graphics.Rect(
-                    root.width - excludeWidth,
-                    0,
-                    root.width,
-                    root.height
-                )
-                root.systemGestureExclusionRects = listOf(rect)
-            }
+            root.post { updateGestureExclusion(root) }
         }
     }
 
+    // onBackPressed.
     override fun onBackPressed() {}
 
+    // onDestroy.
     override fun onDestroy() {
         super.onDestroy()
         PointerAccessibilityService.instance?.mirrorTouchCancel()
@@ -217,13 +260,15 @@ class MirrorActivity : Activity() {
         stopMirrorService()
     }
 
+    // stopMirrorService.
     private fun stopMirrorService() {
         val intent = Intent(this, PointerService::class.java).apply {
-            action = "STOP_MIRROR"
+            action = MirrorConstants.Actions.STOP_MIRROR
         }
         startForegroundService(intent)
     }
 
+    // maybeUpdateLayout.
     private fun maybeUpdateLayout(root: FrameLayout, castContainer: FrameLayout) {
         val w = root.width
         val h = root.height
@@ -233,8 +278,12 @@ class MirrorActivity : Activity() {
         lastRootH = h
         updateCastLayout(root, castContainer)
         updateMirrorButtonDefaults(root)
+        if (enableGestureExclusion) {
+            updateGestureExclusion(root)
+        }
     }
 
+    // createMirrorButton.
     private fun createMirrorButton(
         root: FrameLayout,
         key: String,
@@ -243,7 +292,7 @@ class MirrorActivity : Activity() {
         action: () -> Unit
     ): ImageButton {
         val sizePx = getButtonSizePx()
-        val uiPrefs = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
+        val uiPrefs = getSharedPreferences(MirrorConstants.Prefs.UI, Context.MODE_PRIVATE)
         val button = ImageButton(this).apply {
             tag = key
             layoutParams = FrameLayout.LayoutParams(sizePx, sizePx).apply {
@@ -251,13 +300,13 @@ class MirrorActivity : Activity() {
             }
             background = GradientDrawable().apply {
                 cornerRadius = sizePx / 2f
-                setColor(Color.argb(160, 60, 60, 60))
+                setColor(UiConstants.Colors.BUTTON_BG)
             }
             setImageResource(icon)
-            setColorFilter(Color.WHITE)
+            setColorFilter(UiConstants.Colors.WHITE)
             scaleType = ImageView.ScaleType.CENTER
             setOnClickListener {
-                if (uiPrefs.getBoolean("haptic_mirror_buttons", true)) {
+                if (uiPrefs.getBoolean(MirrorConstants.Prefs.HAPTIC_BUTTONS, true)) {
                     performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
                 }
                 action()
@@ -268,22 +317,23 @@ class MirrorActivity : Activity() {
             MirrorButtonDragTouchListener(
                 key,
                 button,
-                allowTapWhenDragEnabled = key == "mirror_drag"
+                allowTapWhenDragEnabled = key == MirrorConstants.Keys.MIRROR_DRAG
             )
         )
         return button
     }
 
+    // applyMirrorButtonPosition.
     private fun applyMirrorButtonPosition(
         root: FrameLayout,
         button: ImageButton,
         key: String,
         index: Int
     ) {
-        val prefs = getSharedPreferences("mirror_positions", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(MirrorConstants.Prefs.MIRROR_POSITIONS, Context.MODE_PRIVATE)
         val sizePx = getButtonSizePx()
-        val gapPx = dp(8)
-        val margin = dp(16)
+        val gapPx = dp(MirrorConstants.Layout.BUTTON_GAP_DP)
+        val margin = dp(MirrorConstants.Layout.BUTTON_MARGIN_DP)
         val defaultX = (root.width - sizePx - margin).coerceAtLeast(0)
         val defaultY = margin + index * (sizePx + gapPx)
         val x = prefs.getInt("${key}_x", defaultX)
@@ -294,40 +344,43 @@ class MirrorActivity : Activity() {
         button.layoutParams = lp
     }
 
+    // updateMirrorButtonDefaults.
     private fun updateMirrorButtonDefaults(root: FrameLayout) {
         for (i in 0 until root.childCount) {
             val view = root.getChildAt(i)
             val key = view.tag as? String ?: continue
             if (view is ImageButton) {
                 val index = when (key) {
-                    "mirror_toggle" -> 0
-                    "mirror_back" -> 1
-                    "mirror_home" -> 2
-                    "mirror_recents" -> 3
-                    "mirror_drag" -> 4
-                    else -> 0
+                    MirrorConstants.Keys.MIRROR_TOGGLE -> MirrorConstants.ButtonIndex.TOGGLE
+                    MirrorConstants.Keys.MIRROR_BACK -> MirrorConstants.ButtonIndex.BACK
+                    MirrorConstants.Keys.MIRROR_HOME -> MirrorConstants.ButtonIndex.HOME
+                    MirrorConstants.Keys.MIRROR_RECENTS -> MirrorConstants.ButtonIndex.RECENTS
+                    MirrorConstants.Keys.MIRROR_DRAG -> MirrorConstants.ButtonIndex.DRAG
+                    else -> MirrorConstants.ButtonIndex.TOGGLE
                 }
                 applyMirrorButtonPosition(root, view, key, index)
             }
         }
     }
 
+    // toggleMirrorDrag.
     private fun toggleMirrorDrag() {
         mirrorDragEnabled = !mirrorDragEnabled
-        getSharedPreferences("mirror_positions", Context.MODE_PRIVATE)
+        getSharedPreferences(MirrorConstants.Prefs.MIRROR_POSITIONS, Context.MODE_PRIVATE)
             .edit()
-            .putBoolean("drag_enabled", mirrorDragEnabled)
+            .putBoolean(MirrorConstants.Prefs.DRAG_ENABLED, mirrorDragEnabled)
             .apply()
         updateMirrorDragAppearance()
     }
 
+    // updateMirrorDragAppearance.
     private fun updateMirrorDragAppearance() {
         val button = mirrorDragButton ?: return
         val bg = button.background as? GradientDrawable ?: return
         if (mirrorDragEnabled) {
-            bg.setColor(0xFF1E88E5.toInt())
+            bg.setColor(UiConstants.Colors.BUTTON_BG_ACTIVE)
         } else {
-            bg.setColor(Color.argb(160, 60, 60, 60))
+            bg.setColor(UiConstants.Colors.BUTTON_BG)
         }
     }
 
@@ -341,6 +394,7 @@ class MirrorActivity : Activity() {
         private var moved = false
         private var touchSlop = 0
 
+        // onTouch.
         override fun onTouch(v: android.view.View, e: MotionEvent): Boolean {
             val lp = view.layoutParams as FrameLayout.LayoutParams
             when (e.actionMasked) {
@@ -388,7 +442,7 @@ class MirrorActivity : Activity() {
                         return true
                     }
                     if (moved) {
-                        val prefs = getSharedPreferences("mirror_positions", Context.MODE_PRIVATE)
+                        val prefs = getSharedPreferences(MirrorConstants.Prefs.MIRROR_POSITIONS, Context.MODE_PRIVATE)
                         prefs.edit()
                             .putInt("${key}_x", lp.leftMargin)
                             .putInt("${key}_y", lp.topMargin)
@@ -401,6 +455,7 @@ class MirrorActivity : Activity() {
         }
     }
 
+    // updateCastLayout.
     private fun updateCastLayout(root: FrameLayout, castContainer: FrameLayout) {
         val rootW = root.width
         val rootH = root.height
@@ -419,6 +474,19 @@ class MirrorActivity : Activity() {
         }
     }
 
+    // updateGestureExclusion.
+    private fun updateGestureExclusion(root: FrameLayout) {
+        val excludeWidth = dp(MirrorConstants.Layout.GESTURE_EXCLUSION_WIDTH_DP)
+        val rect = android.graphics.Rect(
+            root.width - excludeWidth,
+            0,
+            root.width,
+            root.height
+        )
+        root.systemGestureExclusionRects = listOf(rect)
+    }
+
+    // getCastRect.
     private fun getCastRect(castContainer: FrameLayout): android.graphics.RectF {
         val location = IntArray(2)
         castContainer.getLocationOnScreen(location)
@@ -432,15 +500,17 @@ class MirrorActivity : Activity() {
         )
     }
 
+    // dp.
     private fun dp(v: Int): Int {
         return (v * resources.displayMetrics.density).toInt()
     }
 
+    // getButtonSizePx.
     private fun getButtonSizePx(): Int {
-        val prefs = getSharedPreferences("ui_config", Context.MODE_PRIVATE)
-        val minPx = dp(24)
-        val maxPx = dp(120)
-        val defaultPx = dp(44)
-        return prefs.getInt("button_size", defaultPx).coerceIn(minPx, maxPx)
+        val prefs = getSharedPreferences(MirrorConstants.Prefs.UI, Context.MODE_PRIVATE)
+        val minPx = dp(UiConstants.Sizes.BUTTON_MIN)
+        val maxPx = dp(UiConstants.Sizes.BUTTON_MAX)
+        val defaultPx = dp(UiConstants.Sizes.BUTTON_DEFAULT)
+        return prefs.getInt(MirrorConstants.Prefs.BUTTON_SIZE, defaultPx).coerceIn(minPx, maxPx)
     }
 }

@@ -39,6 +39,9 @@ object UiConstants {
         const val TEXT_SECONDARY = 0xFF9A9A9A.toInt()
         const val TEXT_EMPHASIS = 0xFFE8E8E8.toInt()
         const val BANNER_BG = 0xFF141414.toInt()
+        const val BUTTON_BG = 0xA03C3C3C.toInt()
+        const val BUTTON_BG_ACTIVE = 0xFF1E88E5.toInt()
+        const val CAST_BORDER = 0xFF1A1A1A.toInt()
     }
 
     // Sizes are dp unless otherwise noted.
@@ -53,6 +56,7 @@ object UiConstants {
         const val BUTTON_MIN = 24
         const val BUTTON_MAX = 120
         const val DEFAULT_TRACKPAD_SIZE = 200
+        const val BUTTON_DEFAULT = 44
     }
 
     // Slider bounds/defaults used by settings UI.
