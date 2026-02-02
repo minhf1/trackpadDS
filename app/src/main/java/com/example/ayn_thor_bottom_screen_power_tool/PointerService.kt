@@ -29,8 +29,6 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.FrameLayout
 import android.widget.TextView
-import android.widget.Toast
-import android.content.ComponentName
 import kotlin.concurrent.fixedRateTimer
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
@@ -95,7 +93,6 @@ class PointerService : Service() {
     private var lightOffKeepControls = false
     private var lightOffPrimaryButton = false
     private var lightOffHideBottomButton = false
-    private var activityTaskService: Any? = null
     private val uiPrefs by lazy {
         getSharedPreferences("ui_config", MODE_PRIVATE)
     }
@@ -137,7 +134,6 @@ class PointerService : Service() {
     private var lightPrimaryView: ImageButton? = null
     private var lightPrimaryLp: WindowManager.LayoutParams? = null
     private var lightPrimaryWm: WindowManager? = null
-    private var cachedHomePackages: Set<String>? = null
     private val mainHandler = android.os.Handler(Looper.getMainLooper())
 
     // onCreate.
@@ -991,10 +987,7 @@ class PointerService : Service() {
                 baseX + 7 * (sizePx + gapPx),
                 baseY
             )
-            swapView = createFloatingButton(ctx, R.drawable.ic_swap, sizePx, defaultColor) {
-                android.util.Log.d("PointerService", "Swap button pressed")
-                swapTopTasksBetweenDisplays()
-            }
+            swapView = createFloatingButton(ctx, R.drawable.ic_swap, sizePx, defaultColor) {}
             swapView?.setOnTouchListener(
                 FloatingButtonDragTouchListener(
                     "nav_swap",
@@ -1171,10 +1164,7 @@ class PointerService : Service() {
             "nav_swap",
             R.drawable.ic_swap,
             Color.argb(buttonOpacity * 255 / 100, 60, 60, 60),
-            {
-                android.util.Log.d("PointerService", "Swap button pressed")
-                swapTopTasksBetweenDisplays()
-            },
+            {},
             wm,
             ctx,
             metrics
@@ -2385,213 +2375,6 @@ class PointerService : Service() {
         val w = width.coerceIn(minSize, maxW)
         val h = height.coerceIn(minSize, maxH)
         return w to h
-    }
-
-    // swapTopTasksBetweenDisplays.
-    private fun swapTopTasksBetweenDisplays() {
-        val dm = getSystemService(DISPLAY_SERVICE) as DisplayManager
-        val primaryId = Display.DEFAULT_DISPLAY
-        val secondary = dm.displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY } ?: return
-        // TODO: Remove this forced dry-run once swap testing is complete.
-        val dryRun = true
-
-        val primaryComp = PointerAccessibilityService.instance?.getLastTopComponent(primaryId)
-        val secondaryComp = PointerAccessibilityService.instance?.getLastTopComponent(secondary.displayId)
-        val primaryLabel = getAppLabelForComponent(primaryComp)
-        val secondaryLabel = getAppLabelForComponent(secondaryComp)
-
-        val tasks = getRunningTasksCompat()
-        android.util.Log.d("PointerService", "swap: tasks=${tasks.size} first=${primaryId} secondary=${secondary.displayId}")
-        if (tasks.isEmpty()) {
-            if (dryRun) {
-                val msg = buildSwapDryRunMessage(primaryLabel, secondaryLabel, primaryId, secondary.displayId)
-                showSwapDryRun(msg)
-                return
-            }
-            PointerAccessibilityService.instance
-                ?.swapByLaunchingApps(primaryId, secondary.displayId)
-            return
-        }
-
-        val topPrimary = tasks.firstOrNull { getTaskDisplayId(it) == primaryId && isRealAppTask(it) }
-        val topSecondary = tasks.firstOrNull { getTaskDisplayId(it) == secondary.displayId && isRealAppTask(it) }
-        android.util.Log.d(
-            "PointerService",
-            "swap: topPrimary=${topPrimary?.taskId} topSecondary=${topSecondary?.taskId}"
-        )
-
-        if (dryRun) {
-            val primaryLabel = getAppLabelForTask(topPrimary)
-            val secondaryLabel = getAppLabelForTask(topSecondary)
-            val msg = buildSwapDryRunMessage(primaryLabel, secondaryLabel, primaryId, secondary.displayId)
-            showSwapDryRun(msg)
-            return
-        }
-
-        if (topPrimary != null && topSecondary != null) {
-            moveTaskToDisplayCompat(topPrimary.taskId, secondary.displayId)
-            moveTaskToDisplayCompat(topSecondary.taskId, primaryId)
-        } else if (topPrimary != null) {
-            moveTaskToDisplayCompat(topPrimary.taskId, secondary.displayId)
-        } else if (topSecondary != null) {
-            moveTaskToDisplayCompat(topSecondary.taskId, primaryId)
-        }
-    }
-
-    // getRunningTasksCompat.
-    private fun getRunningTasksCompat(): List<ActivityManager.RunningTaskInfo> {
-        val service = getActivityTaskService() ?: return emptyList()
-        return try {
-            val raw = tryInvokeGetTasks(service, 20)
-            (raw as? List<*>)?.filterIsInstance<ActivityManager.RunningTaskInfo>() ?: emptyList()
-        } catch (t: Throwable) {
-            android.util.Log.w("PointerService", "getTasks failed", t)
-            emptyList()
-        }
-    }
-
-    // tryInvokeGetTasks.
-    private fun tryInvokeGetTasks(service: Any, max: Int): Any? {
-        val cls = service.javaClass
-        val sigs: List<Array<Class<*>>> = listOf(
-            arrayOf(Int::class.javaPrimitiveType!!),
-            arrayOf(Int::class.javaPrimitiveType!!, Boolean::class.javaPrimitiveType!!),
-            arrayOf(Int::class.javaPrimitiveType!!, Boolean::class.javaPrimitiveType!!, Boolean::class.javaPrimitiveType!!)
-        )
-        for (sig in sigs) {
-            try {
-                val method = cls.getMethod("getTasks", *sig)
-                return when (sig.size) {
-                    1 -> method.invoke(service, max)
-                    2 -> method.invoke(service, max, false)
-                    else -> method.invoke(service, max, false, false)
-                }
-            } catch (_: Throwable) {
-            }
-        }
-        return null
-    }
-
-    // getActivityTaskService.
-    private fun getActivityTaskService(): Any? {
-        if (activityTaskService != null) return activityTaskService
-        return try {
-            val atmClass = Class.forName("android.app.ActivityTaskManager")
-            val service = atmClass.getMethod("getService").invoke(null)
-            activityTaskService = service
-            service
-        } catch (t: Throwable) {
-            android.util.Log.w("PointerService", "ActivityTaskManager not available", t)
-            null
-        }
-    }
-
-    // moveTaskToDisplayCompat.
-    private fun moveTaskToDisplayCompat(taskId: Int, displayId: Int) {
-        val service = getActivityTaskService() ?: return
-        try {
-            val method = service.javaClass.getMethod(
-                "moveTaskToDisplay",
-                Int::class.javaPrimitiveType,
-                Int::class.javaPrimitiveType
-            )
-            method.invoke(service, taskId, displayId)
-            android.util.Log.d("PointerService", "moveTaskToDisplay ok task=$taskId display=$displayId")
-        } catch (t: Throwable) {
-            android.util.Log.w("PointerService", "moveTaskToDisplay failed", t)
-        }
-    }
-
-    // isRealAppTask.
-    private fun isRealAppTask(info: ActivityManager.RunningTaskInfo): Boolean {
-        val top = info.topActivity ?: return false
-        val pkg = top.packageName
-        return !isDisallowedPackage(pkg)
-    }
-
-    // getTaskDisplayId.
-    private fun getTaskDisplayId(info: ActivityManager.RunningTaskInfo): Int {
-        return try {
-            val method = info.javaClass.getMethod("getDisplayId")
-            (method.invoke(info) as? Int) ?: Display.DEFAULT_DISPLAY
-        } catch (_: Throwable) {
-            try {
-                val field = info.javaClass.getField("displayId")
-                field.getInt(info)
-            } catch (_: Throwable) {
-                Display.DEFAULT_DISPLAY
-            }
-        }
-    }
-
-    // getAppLabelForTask.
-    private fun getAppLabelForTask(task: ActivityManager.RunningTaskInfo?): String? {
-        val component = task?.topActivity ?: return null
-        return getAppLabelForComponent(component)
-    }
-
-    // getAppLabelForComponent.
-    private fun getAppLabelForComponent(component: ComponentName?): String? {
-        if (component == null) return null
-        if (isDisallowedPackage(component.packageName)) return null
-        val label = try {
-            val appInfo = packageManager.getApplicationInfo(component.packageName, 0)
-            packageManager.getApplicationLabel(appInfo).toString()
-        } catch (_: Throwable) {
-            component.packageName
-        }
-        return label
-    }
-
-    // isDisallowedPackage.
-    private fun isDisallowedPackage(pkg: String): Boolean {
-        if (pkg == packageName) return true
-        if (pkg == "com.android.systemui") return true
-        if (isHomePackage(pkg)) return true
-        return false
-    }
-
-    // isHomePackage.
-    private fun isHomePackage(pkg: String): Boolean {
-        val cached = cachedHomePackages
-        if (cached != null) return cached.contains(pkg)
-        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-        val infos =
-            packageManager.queryIntentActivities(
-                intent,
-                PackageManager.ResolveInfoFlags.of(0)
-            )
-        val homes = infos.mapNotNull { it.activityInfo?.packageName }.toSet()
-        android.util.Log.d("PointerService", "home packages=${homes.joinToString()}")
-        cachedHomePackages = homes
-        return homes.contains(pkg)
-    }
-
-    // buildSwapDryRunMessage.
-    private fun buildSwapDryRunMessage(
-        primaryLabel: String?,
-        secondaryLabel: String?,
-        primaryId: Int,
-        secondaryId: Int
-    ): String {
-        val primaryName = primaryLabel ?: "None"
-        val secondaryName = secondaryLabel ?: "None"
-        return when {
-            primaryLabel != null && secondaryLabel != null ->
-                "Dry run: swap \"$primaryName\" (primary) with \"$secondaryName\" (secondary)"
-            primaryLabel != null ->
-                "Dry run: move \"$primaryName\" to secondary display"
-            secondaryLabel != null ->
-                "Dry run: move \"$secondaryName\" to primary display"
-            else ->
-                "Dry run: no app to swap (primary=$primaryId, secondary=$secondaryId)"
-        }
-    }
-
-    // showSwapDryRun.
-    private fun showSwapDryRun(message: String) {
-        android.util.Log.d("PointerService", "swap(dry-run): $message")
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
     // toggleNavButtons.
