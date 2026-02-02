@@ -37,16 +37,9 @@ class MirrorActivity : Activity() {
         // Resolve primary display metrics for touch mapping.
         val dm = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
         val primary = dm.getDisplay(android.view.Display.DEFAULT_DISPLAY)
-        if (primary != null) {
-            val primaryCtx = createDisplayContext(primary)
-            val primaryMetrics = primaryCtx.resources.displayMetrics
-            primaryW = primaryMetrics.widthPixels
-            primaryH = primaryMetrics.heightPixels
-        } else {
-            val primaryMetrics = resources.displayMetrics
-            primaryW = primaryMetrics.widthPixels
-            primaryH = primaryMetrics.heightPixels
-        }
+        val (realW, realH) = getPrimaryRealSize(primary)
+        primaryW = realW
+        primaryH = realH
 
         // Root container and prefs that drive mirror behavior.
         val root = FrameLayout(this)
@@ -498,6 +491,18 @@ class MirrorActivity : Activity() {
             left + castContainer.width,
             top + castContainer.height
         )
+    }
+
+    // getPrimaryRealSize.
+    private fun getPrimaryRealSize(primary: android.view.Display?): Pair<Int, Int> {
+        if (primary != null) {
+            val metrics = android.util.DisplayMetrics()
+            @Suppress("DEPRECATION")
+            primary.getRealMetrics(metrics)
+            return metrics.widthPixels to metrics.heightPixels
+        }
+        val fallback = resources.displayMetrics
+        return fallback.widthPixels to fallback.heightPixels
     }
 
     // dp.
