@@ -42,6 +42,8 @@ object UiConstants {
         const val BUTTON_BG = 0xA03C3C3C.toInt()
         const val BUTTON_BG_ACTIVE = 0xFF1E88E5.toInt()
         const val CAST_BORDER = 0xFF1A1A1A.toInt()
+        const val CURSOR_DOT = 0xFF00C853.toInt()
+        const val CURSOR_INDICATOR = 0xFF00A844.toInt()
     }
 
     // Sizes are dp unless otherwise noted.
@@ -57,6 +59,11 @@ object UiConstants {
         const val BUTTON_MAX = 120
         const val DEFAULT_TRACKPAD_SIZE = 200
         const val BUTTON_DEFAULT = 44
+    }
+
+    object Cursor {
+        const val DOT_RADIUS_RATIO = 0.18f
+        const val TRI_SIZE_RATIO = 0.22f
     }
 
     // Slider bounds/defaults used by settings UI.
