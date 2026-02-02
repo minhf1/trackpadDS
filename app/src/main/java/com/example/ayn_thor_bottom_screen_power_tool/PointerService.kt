@@ -32,7 +32,6 @@ import android.widget.TextView
 import kotlin.concurrent.fixedRateTimer
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import androidx.core.content.IntentCompat
 import java.lang.ref.WeakReference
 import androidx.core.content.edit
@@ -2467,22 +2466,6 @@ class PointerService : Service() {
         }
 
         updateClickThrough()
-    }
-
-    // hideNavButtonCluster.
-    private fun hideNavButtonCluster(wm: WindowManager) {
-        safeRemoveView(wm, backView)
-        safeRemoveView(wm, homeView)
-        safeRemoveView(wm, recentsView)
-        safeRemoveView(wm, closeView)
-        backView = null
-        homeView = null
-        recentsView = null
-        closeView = null
-        backLp = null
-        homeLp = null
-        recentsLp = null
-        closeLp = null
     }
 
     // loadPosition.
