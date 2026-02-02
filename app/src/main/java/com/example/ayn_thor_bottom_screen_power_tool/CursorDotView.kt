@@ -4,10 +4,15 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.util.AttributeSet
 import android.view.View
 import kotlin.math.min
 
-internal class CursorDotView(ctx: Context, sizePx: Int) : View(ctx) {
+internal class CursorDotView @JvmOverloads constructor(
+    ctx: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : View(ctx, attrs, defStyleAttr) {
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = UiConstants.Colors.CURSOR_DOT
         style = Paint.Style.FILL
@@ -24,10 +29,12 @@ internal class CursorDotView(ctx: Context, sizePx: Int) : View(ctx) {
     private val upPath = Path()
     private val downPath = Path()
 
-    init {
+    // Constructor for programmatic sizing.
+    constructor(ctx: Context, sizePx: Int) : this(ctx) {
         layoutParams = android.view.ViewGroup.LayoutParams(sizePx, sizePx)
     }
 
+    // Updates scroll direction indicator and triggers redraw if changed.
     fun setScrollIndicator(dirX: Int, dirY: Int) {
         if (this.dirX == dirX && this.dirY == dirY) return
         this.dirX = dirX
@@ -35,6 +42,7 @@ internal class CursorDotView(ctx: Context, sizePx: Int) : View(ctx) {
         invalidate()
     }
 
+    // Draws the center dot and directional indicators.
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val cx = width / 2f
@@ -55,6 +63,7 @@ internal class CursorDotView(ctx: Context, sizePx: Int) : View(ctx) {
         }
     }
 
+    // Recomputes geometry for dot and indicator triangles when the view size changes.
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         val size = min(w, h).toFloat()
