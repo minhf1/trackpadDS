@@ -1,5 +1,6 @@
 package com.example.ayn_thor_bottom_screen_power_tool
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -15,6 +16,7 @@ import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
+import androidx.core.content.edit
 
 class MirrorActivity : Activity() {
     private var primaryW = 0
@@ -267,6 +269,7 @@ class MirrorActivity : Activity() {
     }
 
     // onBackPressed.
+    @SuppressLint("GestureBackNavigation")
     override fun onBackPressed() {}
 
     // onDestroy.
@@ -384,9 +387,9 @@ class MirrorActivity : Activity() {
     private fun toggleMirrorDrag() {
         mirrorDragEnabled = !mirrorDragEnabled
         getSharedPreferences(MirrorConstants.Prefs.MIRROR_POSITIONS, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(MirrorConstants.Prefs.DRAG_ENABLED, mirrorDragEnabled)
-            .apply()
+            .edit {
+                putBoolean(MirrorConstants.Prefs.DRAG_ENABLED, mirrorDragEnabled)
+            }
         updateMirrorDragAppearance()
     }
 
@@ -460,10 +463,10 @@ class MirrorActivity : Activity() {
                     }
                     if (moved) {
                         val prefs = getSharedPreferences(MirrorConstants.Prefs.MIRROR_POSITIONS, Context.MODE_PRIVATE)
-                        prefs.edit()
-                            .putInt("${key}_x", lp.leftMargin)
-                            .putInt("${key}_y", lp.topMargin)
-                            .apply()
+                        prefs.edit {
+                            putInt("${key}_x", lp.leftMargin)
+                                .putInt("${key}_y", lp.topMargin)
+                        }
                     }
                     return true
                 }
