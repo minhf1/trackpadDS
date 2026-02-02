@@ -212,9 +212,12 @@ class PointerService : Service() {
         cursorWm = displayCtx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         ensureLightPrimaryButton(displayCtx)
 
-        val metrics = displayCtx.resources.displayMetrics
-        PointerBus.setDisplaySize(metrics.widthPixels, metrics.heightPixels)
+        val dm = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        val primary = dm.getDisplay(Display.DEFAULT_DISPLAY)
+        val (w, h) = getRealBoundsOrFallback(primary, displayCtx)
+        PointerBus.setDisplaySize(w, h)
 
+        val metrics = displayCtx.resources.displayMetrics
         val sizePx = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,
             PointerConstants.Sizes.CURSOR_DP,
@@ -2737,6 +2740,33 @@ class PointerService : Service() {
         } else {
             this
         }
+    }
+
+    // getRealBoundsOrFallback.
+    private fun getRealBoundsOrFallback(
+        primary: Display?,
+        displayCtx: Context
+    ): Pair<Int, Int> {
+        // Try WindowManager.currentWindowMetrics via reflection to avoid SDK checks.
+        try {
+            val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val currentWindowMetrics = wm.javaClass.getMethod("getCurrentWindowMetrics").invoke(wm)
+            val bounds = currentWindowMetrics.javaClass.getMethod("getBounds").invoke(currentWindowMetrics)
+            val width = bounds.javaClass.getMethod("width").invoke(bounds) as Int
+            val height = bounds.javaClass.getMethod("height").invoke(bounds) as Int
+            return width to height
+        } catch (_: Throwable) {
+        }
+
+        if (primary != null) {
+            val metrics = android.util.DisplayMetrics()
+            @Suppress("DEPRECATION")
+            primary.getRealMetrics(metrics)
+            return metrics.widthPixels to metrics.heightPixels
+        }
+
+        val metrics = displayCtx.resources.displayMetrics
+        return metrics.widthPixels to metrics.heightPixels
     }
 
     // safeAddView.
