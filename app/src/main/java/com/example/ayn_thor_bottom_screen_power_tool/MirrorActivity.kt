@@ -29,6 +29,10 @@ class MirrorActivity : Activity() {
     private var mirrorRenderClick = true
     private var lastRootW = 0
     private var lastRootH = 0
+    private var mirrorDownX = 0f
+    private var mirrorDownY = 0f
+    private var mirrorDownTimeMs = 0L
+    private var mirrorMoved = false
 
     // onCreate.
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -80,6 +84,7 @@ class MirrorActivity : Activity() {
                 val rawY = (localY / h) * primaryH.toFloat()
                 var x = rawX.coerceIn(0f, (primaryW - 1).coerceAtLeast(0).toFloat())
                 var y = rawY.coerceIn(0f, (primaryH - 1).coerceAtLeast(0).toFloat())
+                val slop = ViewConfiguration.get(this@MirrorActivity).scaledTouchSlop.toFloat()
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
                         // Lock to edge when touch starts outside the cast area.
@@ -93,6 +98,10 @@ class MirrorActivity : Activity() {
                         }
                         if (lockEdgeX) x = lockedX
                         if (lockEdgeY) y = lockedY
+                        mirrorDownX = x
+                        mirrorDownY = y
+                        mirrorDownTimeMs = event.eventTime
+                        mirrorMoved = false
                         // Begin mirrored touch stream.
                         PointerAccessibilityService.instance?.mirrorTouchDown(x, y)
                         if (mirrorRenderClick) {
@@ -103,6 +112,13 @@ class MirrorActivity : Activity() {
                     MotionEvent.ACTION_MOVE -> {
                         if (lockEdgeX) x = lockedX
                         if (lockEdgeY) y = lockedY
+                        if (!mirrorMoved) {
+                            val dx = x - mirrorDownX
+                            val dy = y - mirrorDownY
+                            if ((dx * dx + dy * dy) > (slop * slop)) {
+                                mirrorMoved = true
+                            }
+                        }
                         // Continue mirrored touch stream.
                         PointerAccessibilityService.instance?.mirrorTouchMove(x, y)
                         if (mirrorRenderClick) {
@@ -117,9 +133,16 @@ class MirrorActivity : Activity() {
                         PointerAccessibilityService.instance?.mirrorTouchUp(x, y)
                         if (mirrorRenderClick) {
                             PointerService.instance?.updateMirrorTouch(x, y, false)
+                            val durationMs = event.eventTime - mirrorDownTimeMs
+                            val isTap = !mirrorMoved &&
+                                durationMs <= ViewConfiguration.getTapTimeout()
+                            if (isTap) {
+                                PointerService.instance?.showMirrorClickRingAt(x, y)
+                            }
                         }
                         lockEdgeX = false
                         lockEdgeY = false
+                        mirrorMoved = false
                         true
                     }
                     MotionEvent.ACTION_CANCEL -> {
@@ -130,6 +153,7 @@ class MirrorActivity : Activity() {
                         }
                         lockEdgeX = false
                         lockEdgeY = false
+                        mirrorMoved = false
                         true
                     }
                     else -> false

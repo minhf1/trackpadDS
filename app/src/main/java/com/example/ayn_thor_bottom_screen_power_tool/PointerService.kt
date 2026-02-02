@@ -533,7 +533,6 @@ class PointerService : Service() {
                 mirrorTouchHide,
                 PointerConstants.Timing.MIRROR_TOUCH_HIDE_INACTIVE_MS
             )
-            showMirrorClickRing(x, y)
         }
         try { mirrorTouchWm?.updateViewLayout(view, lp) } catch (_: Throwable) {}
     }
@@ -647,6 +646,13 @@ class PointerService : Service() {
         view.alpha = 0.7f
         view.animate().alpha(0f).setDuration(180L).start()
         try { mirrorTouchWm?.updateViewLayout(view, lp) } catch (_: Throwable) {}
+    }
+
+    // showMirrorClickRingAt.
+    fun showMirrorClickRingAt(x: Float, y: Float) {
+        if (!mirrorActive) return
+        ensureMirrorTouchOverlay()
+        showMirrorClickRing(x, y)
     }
 
     // detachTrackpad.
