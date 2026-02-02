@@ -13,8 +13,8 @@ android {
         applicationId = "com.example.ayn_thor_bottom_screen_power_tool"
         minSdk = 33
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.0.3"
+        versionCode = 5
+        versionName = "1.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
