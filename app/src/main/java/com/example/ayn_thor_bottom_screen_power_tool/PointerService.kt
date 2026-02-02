@@ -36,14 +36,16 @@ import kotlin.concurrent.fixedRateTimer
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import java.lang.ref.WeakReference
 
 class PointerService : Service() {
     private var screenReceiver: BroadcastReceiver? = null
     companion object {
         @Volatile var dragEnabled: Boolean = false
             private set
-        @Volatile var instance: PointerService? = null
-            private set
+        @Volatile private var instanceRef: WeakReference<PointerService>? = null
+        val instance: PointerService?
+            get() = instanceRef?.get()
     }
     private var cursorWm: WindowManager? = null
     private var cursorLp: WindowManager.LayoutParams? = null
@@ -135,15 +137,17 @@ class PointerService : Service() {
     private var lightPrimaryLp: WindowManager.LayoutParams? = null
     private var lightPrimaryWm: WindowManager? = null
     private var cachedHomePackages: Set<String>? = null
+    private val mainHandler = android.os.Handler(Looper.getMainLooper())
 
+    // onCreate.
     override fun onCreate() {
         super.onCreate()
-        instance = this
+        instanceRef = WeakReference(this)
 
         // startForeground(...) with type as you already fixed
         val notif = buildNotification()
         startForeground(
-            1,
+            PointerConstants.Notification.ID,
             notif,
             ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
@@ -161,8 +165,9 @@ class PointerService : Service() {
         positionPrefs.registerOnSharedPreferenceChangeListener(positionPrefListener)
     }
 
+    // onDestroy.
     override fun onDestroy() {
-        instance = null
+        instanceRef = null
         uiPrefs.unregisterOnSharedPreferenceChangeListener(uiPrefListener)
         positionPrefs.unregisterOnSharedPreferenceChangeListener(positionPrefListener)
         unregisterScreenReceiver()
@@ -175,30 +180,34 @@ class PointerService : Service() {
         super.onDestroy()
     }
 
+    // onStartCommand.
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == "STOP_OVERLAY") {
+        if (intent?.action == PointerConstants.Actions.STOP_OVERLAY) {
             stopOverlayAndSelf()
             return START_NOT_STICKY
         }
-        if (intent?.action == "START_MIRROR") {
-            val resultCode = intent.getIntExtra("projection_result_code", Activity.RESULT_CANCELED)
-            val data = intent.getParcelableExtra<Intent>("projection_data")
+        if (intent?.action == PointerConstants.Actions.START_MIRROR) {
+            val resultCode = intent.getIntExtra(
+                PointerConstants.Extras.PROJECTION_RESULT_CODE,
+                Activity.RESULT_CANCELED
+            )
+            val data = intent.getParcelableExtra<Intent>(PointerConstants.Extras.PROJECTION_DATA)
             if (resultCode == Activity.RESULT_OK && data != null) {
                 startMirrorMode(resultCode, data)
             }
-        } else if (intent?.action == "STOP_MIRROR") {
+        } else if (intent?.action == PointerConstants.Actions.STOP_MIRROR) {
             stopMirrorMode()
         }
         return START_STICKY
     }
+    // onBind.
     override fun onBind(intent: Intent?): IBinder? = null
 
+    // attachCursorOverlayToPrimary.
     private fun attachCursorOverlayToPrimary() {
         if (cursorView != null) return
         // Ensure we target primary display for overlay
-        val dm = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-        val primary = dm.getDisplay(Display.DEFAULT_DISPLAY)
-        val displayCtx = createDisplayContext(primary)
+        val displayCtx = getPrimaryDisplayContext()
 
         cursorWm = displayCtx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         ensureLightPrimaryButton(displayCtx)
@@ -206,11 +215,15 @@ class PointerService : Service() {
         val metrics = displayCtx.resources.displayMetrics
         PointerBus.setDisplaySize(metrics.widthPixels, metrics.heightPixels)
 
-        val sizePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 36f, metrics).toInt()
+        val sizePx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            PointerConstants.Sizes.CURSOR_DP,
+            metrics
+        ).toInt()
         cursorSizePx = sizePx
 
         cursorView = CursorDotView(displayCtx, sizePx)
-        cursorView?.alpha = 0.5f
+        cursorView?.alpha = PointerConstants.Alpha.CURSOR
         cursorLp = WindowManager.LayoutParams(
             sizePx,
             sizePx,
@@ -227,14 +240,18 @@ class PointerService : Service() {
             y = (PointerBus.get().y - half).toInt()
         }
 
-        cursorWm?.addView(cursorView, cursorLp)
+        safeAddView(cursorWm, cursorView, cursorLp)
         lastCursorX = cursorLp?.x ?: 0
         lastCursorY = cursorLp?.y ?: 0
         lastCursorMoveMs = SystemClock.uptimeMillis()
         cursorFadedOut = false
 
         // Update overlay position at ~60Hz
-        cursorTimer = fixedRateTimer("cursor", initialDelay = 0L, period = 16L) {
+        cursorTimer = fixedRateTimer(
+            "cursor",
+            initialDelay = 0L,
+            period = PointerConstants.Timing.CURSOR_TIMER_PERIOD_MS
+        ) {
             val s = PointerBus.get()
             val lp = cursorLp ?: return@fixedRateTimer
             val half = cursorSizePx / 2f
@@ -242,30 +259,40 @@ class PointerService : Service() {
             lp.y = (s.y - half).toInt()
             try {
                 // Must run on main thread
-                android.os.Handler(Looper.getMainLooper()).post {
+                mainHandler.post {
                     val now = SystemClock.uptimeMillis()
                     val indicator = PointerBus.getScrollIndicator()
-                    val scrollRecent = now - indicator.atMs <= 300L
+                    val scrollRecent = now - indicator.atMs <=
+                        PointerConstants.Timing.SCROLL_INDICATOR_WINDOW_MS
                     val moved = (lp.x != lastCursorX || lp.y != lastCursorY)
                     if (moved) {
                         lastCursorX = lp.x
                         lastCursorY = lp.y
                         lastCursorMoveMs = now
                         if (cursorFadedOut) {
-                            cursorView?.animate()?.alpha(0.5f)?.setDuration(120L)?.start()
+                            cursorView?.animate()
+                                ?.alpha(PointerConstants.Alpha.CURSOR)
+                                ?.setDuration(PointerConstants.Timing.CURSOR_FADE_IN_MS)
+                                ?.start()
                             cursorFadedOut = false
                         }
                     } else if (scrollRecent) {
                         lastCursorMoveMs = now
                         if (cursorFadedOut) {
-                            cursorView?.animate()?.alpha(0.5f)?.setDuration(120L)?.start()
+                            cursorView?.animate()
+                                ?.alpha(PointerConstants.Alpha.CURSOR)
+                                ?.setDuration(PointerConstants.Timing.CURSOR_FADE_IN_MS)
+                                ?.start()
                             cursorFadedOut = false
                         }
                     } else if (!cursorFadedOut) {
                         val fadeTimeout = uiPrefs.getInt("cursor_fade_timeout_ms", 1000)
                             .coerceIn(250, 5000)
                         if (now - lastCursorMoveMs >= fadeTimeout) {
-                            cursorView?.animate()?.alpha(0f)?.setDuration(200L)?.start()
+                            cursorView?.animate()
+                                ?.alpha(0f)
+                                ?.setDuration(PointerConstants.Timing.CURSOR_FADE_OUT_MS)
+                                ?.start()
                             cursorFadedOut = true
                         }
                     }
@@ -274,12 +301,13 @@ class PointerService : Service() {
                         if (showIndicator) indicator.dirX else 0,
                         if (showIndicator) indicator.dirY else 0
                     )
-                    try { cursorWm?.updateViewLayout(cursorView, lp) } catch (_: Throwable) {}
+                    safeUpdateViewLayout(cursorWm, cursorView, lp)
                 }
             } catch (_: Throwable) {}
         }
     }
 
+    // detachCursor.
     private fun detachCursor() {
         cursorTimer?.cancel()
         cursorTimer = null
@@ -291,7 +319,7 @@ class PointerService : Service() {
             try {
                 // Only remove if it is actually attached
                 if (tmpV.parent != null) {
-                    tmpWm.removeViewImmediate(tmpV)
+                    safeRemoveViewImmediate(tmpWm, tmpV)
                 }
             } catch (t: Throwable) {
                 // Do NOT swallow silently while debugging
@@ -306,6 +334,7 @@ class PointerService : Service() {
         detachLightPrimaryButton()
     }
 
+    // attachTrackpadOverlayToSecondary.
     private fun attachTrackpadOverlayToSecondary() {
         if (mirrorActive) return
         if (padViewA != null || padViewB != null) return
@@ -380,8 +409,8 @@ class PointerService : Service() {
         padViewA = buildFloatingTrackpadView(displayCtx, isLeft = false)
         padViewB = buildFloatingTrackpadView(displayCtx, isLeft = true)
 
-        padWm?.addView(padViewA, padLpA)
-        padWm?.addView(padViewB, padLpB)
+        safeAddView(padWm, padViewA, padLpA)
+        safeAddView(padWm, padViewB, padLpB)
         padViewA?.setOnTouchListener(
             TrackpadDragTouchListener(
                 "pad_a",
@@ -414,17 +443,17 @@ class PointerService : Service() {
         applyUiConfig()
     }
 
+    // openMirrorPermission.
     private fun openMirrorPermission() {
         val intent = Intent(this, MirrorPermissionActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         startActivity(intent)
     }
 
+    // startMirrorMode.
     private fun startMirrorMode(resultCode: Int, data: Intent) {
         if (mirrorActive) return
-        val dm = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-        val primary = dm.getDisplay(Display.DEFAULT_DISPLAY)
-        val primaryCtx = createDisplayContext(primary)
+        val primaryCtx = getPrimaryDisplayContext()
         val metrics = primaryCtx.resources.displayMetrics
         mirrorPrimaryW = metrics.widthPixels
         mirrorPrimaryH = metrics.heightPixels
@@ -438,6 +467,7 @@ class PointerService : Service() {
         detachCursor()
     }
 
+    // stopMirrorMode.
     private fun stopMirrorMode(restartOverlays: Boolean = true) {
         if (!mirrorActive) return
         mirrorActive = false
@@ -456,6 +486,7 @@ class PointerService : Service() {
         }
     }
 
+    // attachMirrorSurface.
     fun attachMirrorSurface(surface: Surface) {
         if (!mirrorActive || mirrorProjection == null) return
         if (mirrorPrimaryW <= 0 || mirrorPrimaryH <= 0 || mirrorPrimaryDensity <= 0) return
@@ -472,11 +503,13 @@ class PointerService : Service() {
         )
     }
 
+    // detachMirrorSurface.
     fun detachMirrorSurface() {
         mirrorDisplay?.release()
         mirrorDisplay = null
     }
 
+    // updateMirrorTouch.
     fun updateMirrorTouch(x: Float, y: Float, active: Boolean) {
         if (!mirrorActive) return
         ensureMirrorTouchOverlay()
@@ -485,29 +518,39 @@ class PointerService : Service() {
         val size = lp.width.coerceAtLeast(1)
         lp.x = (x - size / 2f).toInt()
         lp.y = (y - size / 2f).toInt()
-        view.alpha = 0.8f
+        view.alpha = PointerConstants.Alpha.MIRROR_TOUCH
         mirrorTouchHandler.removeCallbacks(mirrorTouchHide)
         if (active) {
-            mirrorTouchHandler.postDelayed(mirrorTouchHide, 150L)
+            mirrorTouchHandler.postDelayed(
+                mirrorTouchHide,
+                PointerConstants.Timing.MIRROR_TOUCH_HIDE_ACTIVE_MS
+            )
         } else {
-            mirrorTouchHandler.postDelayed(mirrorTouchHide, 60L)
+            mirrorTouchHandler.postDelayed(
+                mirrorTouchHide,
+                PointerConstants.Timing.MIRROR_TOUCH_HIDE_INACTIVE_MS
+            )
             showMirrorClickRing(x, y)
         }
         try { mirrorTouchWm?.updateViewLayout(view, lp) } catch (_: Throwable) {}
     }
 
+    // hideMirrorTouch.
     private fun hideMirrorTouch() {
         mirrorTouchView?.alpha = 0f
     }
 
+    // ensureMirrorTouchOverlay.
     private fun ensureMirrorTouchOverlay() {
         if (mirrorTouchView != null) return
-        val dm = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-        val primary = dm.getDisplay(Display.DEFAULT_DISPLAY)
-        val displayCtx = createDisplayContext(primary)
+        val displayCtx = getPrimaryDisplayContext()
         mirrorTouchWm = displayCtx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val metrics = displayCtx.resources.displayMetrics
-        val sizePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 20f, metrics).toInt()
+        val sizePx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            PointerConstants.Sizes.MIRROR_TOUCH_DP,
+            metrics
+        ).toInt()
         mirrorTouchView = View(displayCtx).apply {
             background = GradientDrawable().apply {
                 cornerRadius = sizePx / 2f
@@ -529,7 +572,7 @@ class PointerService : Service() {
             x = 0
             y = 0
         }
-        mirrorTouchWm?.addView(mirrorTouchView, mirrorTouchLp)
+        safeAddView(mirrorTouchWm, mirrorTouchView, mirrorTouchLp)
 
         val ringSizePx = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 36f, metrics).toInt()
         mirrorClickView = View(displayCtx).apply {
@@ -561,9 +604,10 @@ class PointerService : Service() {
             x = 0
             y = 0
         }
-        mirrorTouchWm?.addView(mirrorClickView, mirrorClickLp)
+        safeAddView(mirrorTouchWm, mirrorClickView, mirrorClickLp)
     }
 
+    // detachMirrorTouchOverlay.
     private fun detachMirrorTouchOverlay() {
         mirrorTouchHandler.removeCallbacks(mirrorTouchHide)
         val view = mirrorTouchView
@@ -572,14 +616,14 @@ class PointerService : Service() {
         if (view != null && wm != null) {
             try {
                 if (view.parent != null) {
-                    wm.removeViewImmediate(view)
+                    safeRemoveViewImmediate(wm, view)
                 }
             } catch (_: Throwable) {}
         }
         if (clickView != null && wm != null) {
             try {
                 if (clickView.parent != null) {
-                    wm.removeViewImmediate(clickView)
+                    safeRemoveViewImmediate(wm, clickView)
                 }
             } catch (_: Throwable) {}
         }
@@ -590,6 +634,7 @@ class PointerService : Service() {
         mirrorTouchWm = null
     }
 
+    // showMirrorClickRing.
     private fun showMirrorClickRing(x: Float, y: Float) {
         val view = mirrorClickView ?: return
         val lp = mirrorClickLp ?: return
@@ -601,24 +646,25 @@ class PointerService : Service() {
         try { mirrorTouchWm?.updateViewLayout(view, lp) } catch (_: Throwable) {}
     }
 
+    // detachTrackpad.
     private fun detachTrackpad() {
         val wm = padWm
         if (wm != null) {
-            try { if (lightOverlayView != null) wm.removeView(lightOverlayView) } catch (_: Throwable) {}
-            try { if (padViewA != null) wm.removeView(padViewA) } catch (_: Throwable) {}
-            try { if (padViewB != null) wm.removeView(padViewB) } catch (_: Throwable) {}
-            try { if (backView != null) wm.removeView(backView) } catch (_: Throwable) {}
-            try { if (homeView != null) wm.removeView(homeView) } catch (_: Throwable) {}
-            try { if (recentsView != null) wm.removeView(recentsView) } catch (_: Throwable) {}
-            try { if (closeView != null) wm.removeView(closeView) } catch (_: Throwable) {}
-            try { if (dragToggleView != null) wm.removeView(dragToggleView) } catch (_: Throwable) {}
-            try { if (navToggleView != null) wm.removeView(navToggleView) } catch (_: Throwable) {}
-            try { if (hideToggleView != null) wm.removeView(hideToggleView) } catch (_: Throwable) {}
-            try { if (swapView != null) wm.removeView(swapView) } catch (_: Throwable) {}
-            try { if (lightToggleView != null) wm.removeView(lightToggleView) } catch (_: Throwable) {}
-            try { if (mirrorToggleView != null) wm.removeView(mirrorToggleView) } catch (_: Throwable) {}
-            try { if (clickView != null) wm.removeView(clickView) } catch (_: Throwable) {}
-            try { if (rightClickView != null) wm.removeView(rightClickView) } catch (_: Throwable) {}
+            safeRemoveView(wm, lightOverlayView)
+            safeRemoveView(wm, padViewA)
+            safeRemoveView(wm, padViewB)
+            safeRemoveView(wm, backView)
+            safeRemoveView(wm, homeView)
+            safeRemoveView(wm, recentsView)
+            safeRemoveView(wm, closeView)
+            safeRemoveView(wm, dragToggleView)
+            safeRemoveView(wm, navToggleView)
+            safeRemoveView(wm, hideToggleView)
+            safeRemoveView(wm, swapView)
+            safeRemoveView(wm, lightToggleView)
+            safeRemoveView(wm, mirrorToggleView)
+            safeRemoveView(wm, clickView)
+            safeRemoveView(wm, rightClickView)
         }
         lightOverlayView = null
         lightOverlayLp = null
@@ -659,6 +705,7 @@ class PointerService : Service() {
         rightClickLp = null
     }
 
+    // createFloatingButton.
     private fun createFloatingButton(
         ctx: Context,
         icon: Int,
@@ -683,6 +730,7 @@ class PointerService : Service() {
         }.also { floatingButtons.add(it) }
     }
 
+    // buildFloatingTrackpadView.
     private fun buildFloatingTrackpadView(ctx: Context, isLeft: Boolean): View {
         val metrics = ctx.resources.displayMetrics
 
@@ -809,6 +857,7 @@ class PointerService : Service() {
         return card
     }
 
+    // createHeaderButton.
     private fun createHeaderButton(
         ctx: Context,
         icon: Int,
@@ -835,6 +884,7 @@ class PointerService : Service() {
         }.also { trackpadHeaderButtons.add(it) }
     }
 
+    // attachNavButtonsToSecondary.
     private fun attachNavButtonsToSecondary(
         ctx: Context,
         metrics: android.util.DisplayMetrics
@@ -891,7 +941,7 @@ class PointerService : Service() {
                 )
             )
             updateDragToggleAppearance()
-            wm.addView(dragToggleView, dragToggleLp)
+            safeAddView(wm, dragToggleView, dragToggleLp)
         }
 
         if (uiPrefs.getBoolean("show_hide_btn", true)) {
@@ -923,7 +973,7 @@ class PointerService : Service() {
                     allowTapWhenDragEnabled = false
                 )
             )
-            wm.addView(hideToggleView, hideToggleLp)
+            safeAddView(wm, hideToggleView, hideToggleLp)
         }
 
         if (uiPrefs.getBoolean("show_swap_btn", true)) {
@@ -947,10 +997,11 @@ class PointerService : Service() {
                     }
                 )
             )
-            wm.addView(swapView, swapLp)
+            safeAddView(wm, swapView, swapLp)
         }
     }
 
+    // applyUiConfig.
     private fun applyUiConfig() {
         if (mirrorActive) return
         val wm = padWm ?: return
@@ -1214,6 +1265,7 @@ class PointerService : Service() {
         updateTrackpadVisibility(padViewB, padLpB, showPadLeft, wm)
     }
 
+    // updateTrackpadHeaderVisibility.
     private fun updateTrackpadHeaderVisibility(showHeader: Boolean) {
         val visible = showHeader && !hideOverlays
         for (header in trackpadHeaderRows) {
@@ -1222,6 +1274,7 @@ class PointerService : Service() {
         }
     }
 
+    // applyOverlayPositions.
     private fun applyOverlayPositions() {
         val wm = padWm ?: return
         updateOverlayPosition("pad_a", padViewA, padLpA, wm)
@@ -1240,6 +1293,7 @@ class PointerService : Service() {
         updateOverlayPosition("nav_right_click", rightClickView, rightClickLp, wm)
     }
 
+    // updateOverlayPosition.
     private fun updateOverlayPosition(
         key: String,
         view: View?,
@@ -1261,6 +1315,7 @@ class PointerService : Service() {
         }
     }
 
+    // updateTrackpadVisibility.
     private fun updateTrackpadVisibility(
         view: View?,
         lp: WindowManager.LayoutParams?,
@@ -1283,6 +1338,7 @@ class PointerService : Service() {
         }
     }
 
+    // updateButtonOpacity.
     private fun updateButtonOpacity(buttonOpacity: Int) {
         val alpha = (buttonOpacity.coerceIn(0, 100) * 255 / 100)
         for (view in floatingButtons) {
@@ -1299,6 +1355,7 @@ class PointerService : Service() {
         }
     }
 
+    // updateTrackpadOpacity.
     private fun updateTrackpadOpacity(trackpadOpacity: Int) {
         val alpha = (trackpadOpacity.coerceIn(0, 100) / 100f)
         for (card in trackpadCards) {
@@ -1309,6 +1366,7 @@ class PointerService : Service() {
         }
     }
 
+    // updateFloatingButtonState.
     private fun updateFloatingButtonState(
         enabled: Boolean,
         currentView: ImageButton?,
@@ -1365,7 +1423,7 @@ class PointerService : Service() {
                 )
             )
             onLongPress?.let { view.setOnLongClickListener { it() } }
-            wm.addView(view, lp)
+            safeAddView(wm, view, lp)
 
             when (key) {
                 "nav_back" -> { backView = view; backLp = lp }
@@ -1399,21 +1457,25 @@ class PointerService : Service() {
         }
     }
 
+    // removeFloatingButton.
     private fun removeFloatingButton(wm: WindowManager, view: View?) {
         if (view == null) return
         try {
-            wm.removeView(view)
+            safeRemoveView(wm, view)
         } catch (_: Throwable) {
         }
     }
 
+    // detachTrackpadOverlay.
     private fun detachTrackpadOverlay() {
         padWm = null
     }
 
+    // registerScreenReceiver.
     private fun registerScreenReceiver() {
         if (screenReceiver != null) return
         screenReceiver = object : BroadcastReceiver() {
+            // onReceive.
             override fun onReceive(context: Context?, intent: Intent?) {
                 updateOverlaysForLockState()
             }
@@ -1427,6 +1489,7 @@ class PointerService : Service() {
         updateOverlaysForLockState()
     }
 
+    // unregisterScreenReceiver.
     private fun unregisterScreenReceiver() {
         val receiver = screenReceiver ?: return
         try {
@@ -1436,6 +1499,7 @@ class PointerService : Service() {
         screenReceiver = null
     }
 
+    // updateOverlaysForLockState.
     private fun updateOverlaysForLockState() {
         val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
         val locked = km.isKeyguardLocked
@@ -1459,6 +1523,7 @@ class PointerService : Service() {
         private var moved = false
         private var touchSlop = 0
 
+        // onTouch.
         override fun onTouch(v: View, e: MotionEvent): Boolean {
             val lp = getLp() ?: return false
             when (e.actionMasked) {
@@ -1532,6 +1597,7 @@ class PointerService : Service() {
         private var startW = 0
         private var startH = 0
 
+        // onTouch.
         override fun onTouch(v: View, e: MotionEvent): Boolean {
             val lp = getLp() ?: return false
             when (e.actionMasked) {
@@ -1672,9 +1738,11 @@ class PointerService : Service() {
         BOTTOM_RIGHT
     }
 
+    // dp.
     private fun dp(metrics: android.util.DisplayMetrics, dp: Int): Int =
         (dp * metrics.density).roundToInt()
 
+    // getButtonSizePx.
     private fun getButtonSizePx(metrics: android.util.DisplayMetrics): Int {
         val minPx = dp(metrics, 24)
         val maxPx = dp(metrics, 120)
@@ -1682,6 +1750,7 @@ class PointerService : Service() {
         return uiPrefs.getInt("button_size", defaultPx).coerceIn(minPx, maxPx)
     }
 
+    // updateFloatingButtonSizes.
     private fun updateFloatingButtonSizes(
         wm: WindowManager,
         metrics: android.util.DisplayMetrics
@@ -1701,6 +1770,7 @@ class PointerService : Service() {
         updateButtonSizeFor(wm, rightClickView, rightClickLp, sizePx)
     }
 
+    // updateButtonSizeFor.
     private fun updateButtonSizeFor(
         wm: WindowManager,
         view: View?,
@@ -1716,6 +1786,7 @@ class PointerService : Service() {
         try { wm.updateViewLayout(view, lp) } catch (_: Throwable) {}
     }
 
+    // createButtonLayoutParams.
     private fun createButtonLayoutParams(
         key: String,
         sizePx: Int,
@@ -1738,6 +1809,7 @@ class PointerService : Service() {
         }
     }
 
+    // updateDragToggleAppearance.
     private fun updateDragToggleAppearance() {
         val button = dragToggleView ?: return
         val bg = button.background as? GradientDrawable ?: return
@@ -1748,6 +1820,7 @@ class PointerService : Service() {
         }
     }
 
+    // updateDragModeVisuals.
     private fun updateDragModeVisuals() {
         if (shouldHideControlsForLightOff()) {
             applyHideOverlaysVisuals(true, getLightOffKeepVisibleButton())
@@ -1800,11 +1873,13 @@ class PointerService : Service() {
         updateTrackpadHeaderVisibility(!showNavButtons)
     }
 
+    // toggleHideOverlays.
     private fun toggleHideOverlays() {
         hideOverlays = !hideOverlays
         updateHideOverlaysVisuals()
     }
 
+    // toggleLightOverlay.
     private fun toggleLightOverlay() {
         lightOverlayEnabled = !lightOverlayEnabled
         uiPrefs.edit().putBoolean("light_overlay_enabled", lightOverlayEnabled).apply()
@@ -1814,6 +1889,7 @@ class PointerService : Service() {
         updateHideOverlaysVisuals()
     }
 
+    // ensureLightOverlay.
     private fun ensureLightOverlay(ctx: Context) {
         if (lightOverlayView != null) return
         lightOverlayView = View(ctx).apply {
@@ -1834,9 +1910,10 @@ class PointerService : Service() {
             x = 0
             y = 0
         }
-        padWm?.addView(lightOverlayView, lightOverlayLp)
+        safeAddView(padWm, lightOverlayView, lightOverlayLp)
     }
 
+    // updateLightOverlayVisibility.
     private fun updateLightOverlayVisibility() {
         val view = lightOverlayView ?: return
         val shouldShow = lightOverlayEnabled
@@ -1855,6 +1932,7 @@ class PointerService : Service() {
         stopSelf()
     }
 
+    // updateHideOverlaysVisuals.
     private fun updateHideOverlaysVisuals() {
         if (shouldHideControlsForLightOff()) {
             applyHideOverlaysVisuals(true, getLightOffKeepVisibleButton())
@@ -1864,6 +1942,7 @@ class PointerService : Service() {
         updateHideToggleIcon()
     }
 
+    // applyHideOverlaysVisuals.
     private fun applyHideOverlaysVisuals(hide: Boolean, keepVisible: View?) {
         val baseButtonAlpha = (buttonOpacity.coerceIn(0, 100) * 255 / 100)
         val basePadAlpha = (trackpadOpacity.coerceIn(0, 100) / 100f)
@@ -1931,11 +2010,13 @@ class PointerService : Service() {
         closeView?.isClickable = !hide
     }
 
+    // toggleClickThrough.
     private fun toggleClickThrough() {
         clickThroughEnabled = !clickThroughEnabled
         updateClickThrough()
     }
 
+    // updateClickThrough.
     private fun updateClickThrough() {
         val wm = padWm ?: return
         updateClickThroughFor(wm, padViewA, padLpA, clickThroughEnabled)
@@ -1954,6 +2035,7 @@ class PointerService : Service() {
         // Keep hideToggleView clickable so it can be turned back on.
     }
 
+    // updateClickThroughFor.
     private fun updateClickThroughFor(
         wm: WindowManager,
         view: View?,
@@ -1974,6 +2056,7 @@ class PointerService : Service() {
         }
     }
 
+    // bringFloatingButtonsToFront.
     private fun bringFloatingButtonsToFront() {
         val wm = padWm ?: return
         readdFloatingButton(wm, backView, backLp)
@@ -1990,6 +2073,7 @@ class PointerService : Service() {
         readdFloatingButton(wm, rightClickView, rightClickLp)
     }
 
+    // readdFloatingButton.
     private fun readdFloatingButton(
         wm: WindowManager,
         view: View?,
@@ -1998,21 +2082,23 @@ class PointerService : Service() {
         if (view == null || lp == null) return
         try {
             if (view.parent != null) {
-                wm.removeView(view)
+                safeRemoveView(wm, view)
             }
         } catch (_: Throwable) {
         }
         try {
-            wm.addView(view, lp)
+            safeAddView(wm, view, lp)
         } catch (_: Throwable) {
         }
     }
 
+    // updateHideToggleIcon.
     private fun updateHideToggleIcon() {
         val icon = if (hideOverlays) R.drawable.ic_eye_closed else R.drawable.ic_eye_open
         hideToggleView?.setImageResource(icon)
     }
 
+    // updateLightToggleAppearance.
     private fun updateLightToggleAppearance() {
         val button = lightToggleView ?: return
         val bg = button.background as? GradientDrawable ?: return
@@ -2024,6 +2110,7 @@ class PointerService : Service() {
         }
     }
 
+    // updateLightPrimaryButtonAppearance.
     private fun updateLightPrimaryButtonAppearance() {
         val button = lightPrimaryView ?: return
         val bg = button.background as? GradientDrawable ?: return
@@ -2035,6 +2122,7 @@ class PointerService : Service() {
         }
     }
 
+    // ensureLightPrimaryButton.
     private fun ensureLightPrimaryButton(ctx: Context) {
         if (lightPrimaryView != null) return
         val metrics = ctx.resources.displayMetrics
@@ -2090,6 +2178,7 @@ class PointerService : Service() {
         private var moved = false
         private var touchSlop = 0
 
+        // onTouch.
         override fun onTouch(v: View, e: MotionEvent): Boolean {
             val lp = getLp() ?: return false
             when (e.actionMasked) {
@@ -2136,13 +2225,14 @@ class PointerService : Service() {
         }
     }
 
+    // detachLightPrimaryButton.
     private fun detachLightPrimaryButton() {
         val wm = lightPrimaryWm
         val view = lightPrimaryView
         if (wm != null && view != null) {
             try {
                 if (view.parent != null) {
-                    wm.removeViewImmediate(view)
+                    safeRemoveViewImmediate(wm, view)
                 }
             } catch (_: Throwable) {
             }
@@ -2152,12 +2242,13 @@ class PointerService : Service() {
         lightPrimaryWm = null
     }
 
+    // updateLightPrimaryButtonVisibility.
     private fun updateLightPrimaryButtonVisibility() {
         val shouldShow = lightOverlayEnabled && lightOffHideBottomButton && lightOffPrimaryButton
         if (!shouldShow) {
             val view = lightPrimaryView
             if (view != null && view.parent != null) {
-                try { lightPrimaryWm?.removeView(view) } catch (_: Throwable) {}
+                safeRemoveView(lightPrimaryWm, view)
             }
             return
         }
@@ -2165,13 +2256,14 @@ class PointerService : Service() {
         val view = lightPrimaryView ?: return
         val lp = lightPrimaryLp ?: return
         if (view.parent == null) {
-            try { wm.addView(view, lp) } catch (_: Throwable) {}
+            safeAddView(wm, view, lp)
         } else {
             try { wm.updateViewLayout(view, lp) } catch (_: Throwable) {}
         }
         updateLightPrimaryButtonAppearance()
     }
 
+    // updateLightPrimaryButtonSize.
     private fun updateLightPrimaryButtonSize() {
         val view = lightPrimaryView ?: return
         val lp = lightPrimaryLp ?: return
@@ -2187,6 +2279,7 @@ class PointerService : Service() {
         }
     }
 
+    // getDragBounds.
     private fun getDragBounds(v: View, lp: WindowManager.LayoutParams): Pair<Int, Int> {
         val display = v.display
         val metrics = android.util.DisplayMetrics()
@@ -2203,6 +2296,7 @@ class PointerService : Service() {
         return maxX to maxY
     }
 
+    // getDisplaySize.
     private fun getDisplaySize(v: View): Pair<Int, Int> {
         val display = v.display
         val metrics = android.util.DisplayMetrics()
@@ -2215,6 +2309,7 @@ class PointerService : Service() {
         return metrics.widthPixels to metrics.heightPixels
     }
 
+    // applyTrackpadSizes.
     private fun applyTrackpadSizes(
         wm: WindowManager,
         metrics: android.util.DisplayMetrics
@@ -2223,6 +2318,7 @@ class PointerService : Service() {
         updateTrackpadSize(padViewB, padLpB, "trackpad_left", wm, metrics)
     }
 
+    // updateTrackpadSize.
     private fun updateTrackpadSize(
         view: View?,
         lp: WindowManager.LayoutParams?,
@@ -2249,6 +2345,7 @@ class PointerService : Service() {
         }
     }
 
+    // clampTrackpadSize.
     private fun clampTrackpadSize(view: View, width: Int, height: Int): Pair<Int, Int> {
         val (displayW, displayH) = getDisplaySize(view)
         val minSize = dp(view.resources.displayMetrics, 120)
@@ -2259,6 +2356,7 @@ class PointerService : Service() {
         return w to h
     }
 
+    // clampTrackpadSize.
     private fun clampTrackpadSize(
         metrics: android.util.DisplayMetrics,
         width: Int,
@@ -2272,6 +2370,7 @@ class PointerService : Service() {
         return w to h
     }
 
+    // swapTopTasksBetweenDisplays.
     private fun swapTopTasksBetweenDisplays() {
         val dm = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
         val primaryId = Display.DEFAULT_DISPLAY
@@ -2322,6 +2421,7 @@ class PointerService : Service() {
         }
     }
 
+    // getRunningTasksCompat.
     private fun getRunningTasksCompat(): List<ActivityManager.RunningTaskInfo> {
         val service = getActivityTaskService() ?: return emptyList()
         return try {
@@ -2333,6 +2433,7 @@ class PointerService : Service() {
         }
     }
 
+    // tryInvokeGetTasks.
     private fun tryInvokeGetTasks(service: Any, max: Int): Any? {
         val cls = service.javaClass
         val sigs: List<Array<Class<*>>> = listOf(
@@ -2354,6 +2455,7 @@ class PointerService : Service() {
         return null
     }
 
+    // getActivityTaskService.
     private fun getActivityTaskService(): Any? {
         if (activityTaskService != null) return activityTaskService
         return try {
@@ -2367,6 +2469,7 @@ class PointerService : Service() {
         }
     }
 
+    // moveTaskToDisplayCompat.
     private fun moveTaskToDisplayCompat(taskId: Int, displayId: Int) {
         val service = getActivityTaskService() ?: return
         try {
@@ -2382,6 +2485,7 @@ class PointerService : Service() {
         }
     }
 
+    // isRealAppTask.
     private fun isRealAppTask(info: ActivityManager.RunningTaskInfo): Boolean {
         val top = info.topActivity ?: return false
         val pkg = top.packageName
@@ -2389,6 +2493,7 @@ class PointerService : Service() {
         return true
     }
 
+    // getTaskDisplayId.
     private fun getTaskDisplayId(info: ActivityManager.RunningTaskInfo): Int {
         return try {
             val method = info.javaClass.getMethod("getDisplayId")
@@ -2403,11 +2508,13 @@ class PointerService : Service() {
         }
     }
 
+    // getAppLabelForTask.
     private fun getAppLabelForTask(task: ActivityManager.RunningTaskInfo?): String? {
         val component = task?.topActivity ?: return null
         return getAppLabelForComponent(component)
     }
 
+    // getAppLabelForComponent.
     private fun getAppLabelForComponent(component: ComponentName?): String? {
         if (component == null) return null
         if (isDisallowedPackage(component.packageName)) return null
@@ -2420,6 +2527,7 @@ class PointerService : Service() {
         return label
     }
 
+    // isDisallowedPackage.
     private fun isDisallowedPackage(pkg: String): Boolean {
         if (pkg == packageName) return true
         if (pkg == "com.android.systemui") return true
@@ -2427,6 +2535,7 @@ class PointerService : Service() {
         return false
     }
 
+    // isHomePackage.
     private fun isHomePackage(pkg: String): Boolean {
         val cached = cachedHomePackages
         if (cached != null) return cached.contains(pkg)
@@ -2446,6 +2555,7 @@ class PointerService : Service() {
         return homes.contains(pkg)
     }
 
+    // buildSwapDryRunMessage.
     private fun buildSwapDryRunMessage(
         primaryLabel: String?,
         secondaryLabel: String?,
@@ -2466,16 +2576,19 @@ class PointerService : Service() {
         }
     }
 
+    // showSwapDryRun.
     private fun showSwapDryRun(message: String) {
         android.util.Log.d("PointerService", "swap(dry-run): $message")
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
+    // toggleNavButtons.
     private fun toggleNavButtons() {
         val current = uiPrefs.getBoolean("nav_buttons_enabled", true)
         uiPrefs.edit().putBoolean("nav_buttons_enabled", !current).apply()
     }
 
+    // showNavButtonCluster.
     private fun showNavButtonCluster(
         ctx: Context,
         wm: WindowManager,
@@ -2506,7 +2619,7 @@ class PointerService : Service() {
                     wm.updateViewLayout(backView, lp)
                 })
             )
-            wm.addView(backView, backLp)
+        safeAddView(wm, backView, backLp)
             slot++
         }
         if (showHome) {
@@ -2521,7 +2634,7 @@ class PointerService : Service() {
                     wm.updateViewLayout(homeView, lp)
                 })
             )
-            wm.addView(homeView, homeLp)
+        safeAddView(wm, homeView, homeLp)
             slot++
         }
         if (showRecents) {
@@ -2536,7 +2649,7 @@ class PointerService : Service() {
                     wm.updateViewLayout(recentsView, lp)
                 })
             )
-            wm.addView(recentsView, recentsLp)
+        safeAddView(wm, recentsView, recentsLp)
             slot++
         }
         if (showStop) {
@@ -2555,17 +2668,18 @@ class PointerService : Service() {
                     wm.updateViewLayout(closeView, lp)
                 })
             )
-            wm.addView(closeView, closeLp)
+            safeAddView(wm, closeView, closeLp)
         }
 
         updateClickThrough()
     }
 
+    // hideNavButtonCluster.
     private fun hideNavButtonCluster(wm: WindowManager) {
-        try { if (backView != null) wm.removeView(backView) } catch (_: Throwable) {}
-        try { if (homeView != null) wm.removeView(homeView) } catch (_: Throwable) {}
-        try { if (recentsView != null) wm.removeView(recentsView) } catch (_: Throwable) {}
-        try { if (closeView != null) wm.removeView(closeView) } catch (_: Throwable) {}
+        safeRemoveView(wm, backView)
+        safeRemoveView(wm, homeView)
+        safeRemoveView(wm, recentsView)
+        safeRemoveView(wm, closeView)
         backView = null
         homeView = null
         recentsView = null
@@ -2576,6 +2690,7 @@ class PointerService : Service() {
         closeLp = null
     }
 
+    // loadPosition.
     private fun loadPosition(key: String, defaultX: Int, defaultY: Int): Pair<Int, Int> {
         val prefs = getSharedPreferences("floating_positions", Context.MODE_PRIVATE)
         val x = prefs.getInt("${key}_x", defaultX)
@@ -2583,6 +2698,7 @@ class PointerService : Service() {
         return x to y
     }
 
+    // loadTrackpadSize.
     private fun loadTrackpadSize(key: String, defaultW: Int, defaultH: Int): Pair<Int, Int> {
         val w = uiPrefs.getInt("${key}_width", -1)
         val h = uiPrefs.getInt("${key}_height", -1)
@@ -2595,6 +2711,7 @@ class PointerService : Service() {
         return legacyW to legacyH
     }
 
+    // savePosition.
     private fun savePosition(key: String, x: Int, y: Int) {
         val prefs = getSharedPreferences("floating_positions", Context.MODE_PRIVATE)
         prefs.edit()
@@ -2603,6 +2720,7 @@ class PointerService : Service() {
             .apply()
     }
 
+    // saveTrackpadSize.
     private fun saveTrackpadSize(key: String, width: Int, height: Int) {
         uiPrefs.edit()
             .putInt("${key}_width", width)
@@ -2610,15 +2728,76 @@ class PointerService : Service() {
             .apply()
     }
 
+    // getPrimaryDisplayContext.
+    private fun getPrimaryDisplayContext(): Context {
+        val dm = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        val primary = dm.getDisplay(Display.DEFAULT_DISPLAY)
+        return if (primary != null) {
+            createDisplayContext(primary)
+        } else {
+            this
+        }
+    }
+
+    // safeAddView.
+    private fun safeAddView(
+        wm: WindowManager?,
+        view: View?,
+        lp: WindowManager.LayoutParams?
+    ) {
+        if (wm == null || view == null || lp == null) return
+        try {
+            wm.addView(view, lp)
+        } catch (_: Throwable) {
+        }
+    }
+
+    // safeUpdateViewLayout.
+    private fun safeUpdateViewLayout(
+        wm: WindowManager?,
+        view: View?,
+        lp: WindowManager.LayoutParams?
+    ) {
+        if (wm == null || view == null || lp == null) return
+        try {
+            wm.updateViewLayout(view, lp)
+        } catch (_: Throwable) {
+        }
+    }
+
+    // safeRemoveView.
+    private fun safeRemoveView(
+        wm: WindowManager?,
+        view: View?
+    ) {
+        if (wm == null || view == null) return
+        try {
+            wm.removeView(view)
+        } catch (_: Throwable) {
+        }
+    }
+
+    // safeRemoveViewImmediate.
+    private fun safeRemoveViewImmediate(
+        wm: WindowManager?,
+        view: View?
+    ) {
+        if (wm == null || view == null) return
+        try {
+            wm.removeViewImmediate(view)
+        } catch (_: Throwable) {
+        }
+    }
+
     // Keep your existing notification builder here
     private fun buildNotification(): Notification {
-        val channelId = "pointer_fgs"
+        val channelId = PointerConstants.Notification.CHANNEL_ID
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val ch = NotificationChannel(
                 channelId,
-                "Pointer Service",
+                PointerConstants.Notification.CHANNEL_NAME,
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 setShowBadge(false)
@@ -2639,7 +2818,7 @@ class PointerService : Service() {
 
         return NotificationCompat.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.ic_menu_compass) // MUST be set
-            .setContentTitle("Trackpad running")
+            .setContentTitle(PointerConstants.Notification.TITLE)
             .setContentText("Overlay + accessibility enabled")
             .setContentIntent(pi)
             .setOngoing(true)
@@ -2648,10 +2827,12 @@ class PointerService : Service() {
             .build()
     }
 
+    // shouldHideControlsForLightOff.
     private fun shouldHideControlsForLightOff(): Boolean {
         return lightOverlayEnabled && lightOffKeepControls
     }
 
+    // getLightOffKeepVisibleButton.
     private fun getLightOffKeepVisibleButton(): View? {
         return if (lightOffHideBottomButton) null else lightToggleView
     }
