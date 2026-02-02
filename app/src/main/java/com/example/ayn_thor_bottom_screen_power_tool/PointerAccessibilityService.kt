@@ -6,6 +6,7 @@ import android.graphics.Path
 import android.app.ActivityOptions
 import android.content.ComponentName
 import android.content.Intent
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
 import kotlin.math.abs
@@ -21,6 +22,14 @@ class PointerAccessibilityService : AccessibilityService() {
     private var mirrorStroke: GestureDescription.StrokeDescription? = null
     private var mirrorLastX = 0f
     private var mirrorLastY = 0f
+    private var mirrorLastEventMs = 0L
+    private val mirrorHoldDurationMs = 10_000L
+    private val mirrorMinSegmentMs = 4L
+    private val mirrorMaxSegmentMs = 12L
+    private val mirrorDispatchIntervalMs = 6L
+    private var mirrorPendingX = 0f
+    private var mirrorPendingY = 0f
+    private var mirrorHasPending = false
 
     private val lastTopByDisplay = mutableMapOf<Int, ComponentName>()
 
@@ -117,15 +126,23 @@ class PointerAccessibilityService : AccessibilityService() {
     }
 
     fun mirrorTouchDown(x: Float, y: Float) {
+        val now = SystemClock.uptimeMillis()
         val path = Path().apply {
             moveTo(x, y)
             lineTo(x + 0.1f, y + 0.1f)
         }
         // Fix this function - bounding box not correct
-        val stroke = GestureDescription.StrokeDescription(path, 0, 1, true)
+        val stroke = GestureDescription.StrokeDescription(
+            path,
+            0,
+            mirrorHoldDurationMs,
+            true
+        )
         mirrorStroke = stroke
         mirrorLastX = x
         mirrorLastY = y
+        mirrorLastEventMs = now
+        mirrorHasPending = false
         dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
     }
 
@@ -134,30 +151,55 @@ class PointerAccessibilityService : AccessibilityService() {
             mirrorTouchDown(x, y)
             return
         }
+        val now = SystemClock.uptimeMillis()
+        if (now - mirrorLastEventMs < mirrorDispatchIntervalMs) {
+            mirrorPendingX = x
+            mirrorPendingY = y
+            mirrorHasPending = true
+            return
+        }
+        val endX = if (mirrorHasPending) mirrorPendingX else x
+        val endY = if (mirrorHasPending) mirrorPendingY else y
+        mirrorHasPending = false
+        val duration = (now - mirrorLastEventMs)
+            .coerceAtLeast(mirrorMinSegmentMs)
+            .coerceAtMost(mirrorMaxSegmentMs)
         val path = Path().apply {
             moveTo(mirrorLastX, mirrorLastY)
-            lineTo(x, y)
+            lineTo(endX, endY)
         }
-        val next = current.continueStroke(path, 0, 1, true)
+        val next = current.continueStroke(path, 0, duration, true)
         mirrorStroke = next
-        mirrorLastX = x
-        mirrorLastY = y
+        mirrorLastX = endX
+        mirrorLastY = endY
+        mirrorLastEventMs = now
         dispatchGesture(GestureDescription.Builder().addStroke(next).build(), null, null)
     }
 
     fun mirrorTouchUp(x: Float, y: Float) {
         val current = mirrorStroke ?: return
+        val now = SystemClock.uptimeMillis()
+        val endX = if (mirrorHasPending) mirrorPendingX else x
+        val endY = if (mirrorHasPending) mirrorPendingY else y
+        mirrorHasPending = false
+        val duration = (now - mirrorLastEventMs)
+            .coerceAtLeast(mirrorMinSegmentMs)
+            .coerceAtMost(mirrorMaxSegmentMs)
         val path = Path().apply {
             moveTo(mirrorLastX, mirrorLastY)
-            lineTo(x, y)
+            lineTo(endX, endY)
         }
-        val next = current.continueStroke(path, 0, 1, false)
+        val next = current.continueStroke(path, 0, duration, false)
         mirrorStroke = null
+        mirrorLastEventMs = 0L
+        mirrorHasPending = false
         dispatchGesture(GestureDescription.Builder().addStroke(next).build(), null, null)
     }
 
     fun mirrorTouchCancel() {
         mirrorStroke = null
+        mirrorLastEventMs = 0L
+        mirrorHasPending = false
     }
 
     fun focusPrimaryBySwipe(displayW: Int, displayH: Int) {
