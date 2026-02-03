@@ -1,5 +1,6 @@
 package com.example.ayn_thor_bottom_screen_power_tool
 
+import android.annotation.SuppressLint
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.MotionEvent
@@ -8,10 +9,12 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import kotlin.math.roundToInt
 
+@SuppressLint("ViewConstructor")
 class FloatingTrackpadLayout(
-    private val activity: android.app.Activity
+    activity: android.app.Activity
 ) : FrameLayout(activity) {
 
+    // Build the trackpad card UI and wire dragging to the header.
     init {
         val card = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -48,16 +51,19 @@ class FloatingTrackpadLayout(
         header.setOnTouchListener(WindowDragTouchListener(activity))
     }
 
+    // dp.
     private fun dp(v: Int): Int {
         return (v * resources.displayMetrics.density).roundToInt()
     }
 
+    // WindowDragTouchListener.
     private class WindowDragTouchListener(
         private val activity: android.app.Activity
     ) : OnTouchListener {
         private var lastRawX = 0f
         private var lastRawY = 0f
 
+        // onTouch.
         override fun onTouch(v: View, e: MotionEvent): Boolean {
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
