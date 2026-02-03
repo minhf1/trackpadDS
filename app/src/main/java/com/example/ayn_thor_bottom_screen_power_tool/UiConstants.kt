@@ -42,6 +42,8 @@ object UiConstants {
         const val BUTTON_BG = 0xA03C3C3C.toInt()
         const val BUTTON_BG_ACTIVE = 0xFF1E88E5.toInt()
         const val CAST_BORDER = 0xFF1A1A1A.toInt()
+        const val TRACKPAD_CARD = 0xDC1E1E1E.toInt()
+        const val TRACKPAD_HEADER = 0xDC323232.toInt()
         const val CURSOR_DOT = 0xFF00C853.toInt()
         const val CURSOR_INDICATOR = 0xFF00A844.toInt()
     }
@@ -55,6 +57,9 @@ object UiConstants {
         const val INPUT_WIDTH = 120
 
         const val TRACKPAD_MIN = 120
+        const val TRACKPAD_HEADER = 36
+        const val TRACKPAD_CARD_RADIUS = 24
+        const val TRACKPAD_ELEVATION = 20
         const val BUTTON_MIN = 24
         const val BUTTON_MAX = 120
         const val DEFAULT_TRACKPAD_SIZE = 200
