@@ -48,7 +48,9 @@ class MirrorActivity : Activity() {
         primaryH = realH
 
         // Root container and prefs that drive mirror behavior.
-        val root = FrameLayout(this)
+        val root = FrameLayout(this).apply {
+            setBackgroundColor(UiConstants.Colors.BLACK)
+        }
         val uiPrefs = getSharedPreferences(MirrorConstants.Prefs.UI, Context.MODE_PRIVATE)
         mirrorRenderClick = uiPrefs.getBoolean(MirrorConstants.Prefs.RENDER_CLICK, true)
         mirrorDragEnabled = getSharedPreferences(MirrorConstants.Prefs.MIRROR_POSITIONS, Context.MODE_PRIVATE)
