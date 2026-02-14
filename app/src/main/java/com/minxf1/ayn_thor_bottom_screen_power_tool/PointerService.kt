@@ -1334,6 +1334,7 @@ class PointerService : Service() {
     ) {
         if (view == null || lp == null) return
         view.alpha = if (show) 1f else 0f
+        view.visibility = if (show) View.VISIBLE else View.GONE
         val newFlags = if (show) {
             lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
         } else {
@@ -1345,6 +1346,14 @@ class PointerService : Service() {
                 wm.updateViewLayout(view, lp)
             } catch (_: Throwable) {
             }
+        }
+    }
+
+    private fun isTrackpadCardEnabled(card: View): Boolean {
+        return when (card) {
+            padViewA -> uiPrefs.getBoolean("show_trackpad_right", true)
+            padViewB -> uiPrefs.getBoolean("show_trackpad_left", true)
+            else -> true
         }
     }
 
@@ -1868,9 +1877,15 @@ class PointerService : Service() {
         }
 
         for (card in trackpadCards) {
+            if (!isTrackpadCardEnabled(card)) {
+                card.alpha = 0f
+                card.visibility = View.GONE
+                continue
+            }
             val bg = card.background as? GradientDrawable ?: continue
             bg.alpha = (cardAlpha * 255).toInt().coerceIn(0, 255)
             card.alpha = cardAlpha
+            card.visibility = View.VISIBLE
         }
 
         for (pad in trackpadSurfaces) {
@@ -1992,6 +2007,11 @@ class PointerService : Service() {
         }
 
         for (card in trackpadCards) {
+            if (!isTrackpadCardEnabled(card)) {
+                card.alpha = 0f
+                card.visibility = View.GONE
+                continue
+            }
             val bg = card.background as? GradientDrawable ?: continue
             bg.alpha = (cardAlpha * 255).toInt().coerceIn(0, 255)
             card.alpha = cardAlpha
