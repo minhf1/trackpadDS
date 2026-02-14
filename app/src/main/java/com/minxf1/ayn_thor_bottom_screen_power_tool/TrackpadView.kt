@@ -92,6 +92,14 @@ class TrackpadView(ctx: Context) : View(ctx) {
             MotionEvent.ACTION_POINTER_UP -> {
                 val multiTouchClickEnabled =
                     uiPrefs.getBoolean("trackpad_click_multitouch", true)
+                val tapTimeoutMs = uiPrefs.getInt(
+                    "trackpad_click_timeout_ms",
+                    UiConstants.Sliders.TRACKPAD_CLICK_TIMEOUT_DEFAULT_MS
+                )
+                val tapDistancePx = uiPrefs.getInt(
+                    "trackpad_click_distance_px",
+                    UiConstants.Sliders.TRACKPAD_CLICK_DISTANCE_DEFAULT_PX
+                ).toFloat()
                 // After a pointer-up, MotionEvent still reports the old pointerCount
                 // during this callback. Effective count will be pointerCount - 1.
                 val remaining = e.pointerCount - 1
@@ -104,7 +112,7 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     val dist =
                         abs(e.getX(e.actionIndex) - (pointerDownX[pointerId] ?: e.getX(e.actionIndex))) +
                             abs(e.getY(e.actionIndex) - (pointerDownY[pointerId] ?: e.getY(e.actionIndex)))
-                    if (dt < 200 && dist < 20f) {
+                    if (dt < tapTimeoutMs && dist < tapDistancePx) {
                         val s = PointerBus.get()
                         if (uiPrefs.getBoolean("haptic_trackpad_press", true)) {
                             performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
@@ -239,9 +247,17 @@ class TrackpadView(ctx: Context) : View(ctx) {
 
             MotionEvent.ACTION_UP -> {
                 // If it was a short, small movement => click
+                val tapTimeoutMs = uiPrefs.getInt(
+                    "trackpad_click_timeout_ms",
+                    UiConstants.Sliders.TRACKPAD_CLICK_TIMEOUT_DEFAULT_MS
+                )
+                val tapDistancePx = uiPrefs.getInt(
+                    "trackpad_click_distance_px",
+                    UiConstants.Sliders.TRACKPAD_CLICK_DISTANCE_DEFAULT_PX
+                ).toFloat()
                 val dt = e.eventTime - downTime
                 val dist = abs(e.x - downX) + abs(e.y - downY)
-                if (!isTwoFinger && !hasTwoFingerGesture && dt < 200 && dist < 20f) {
+                if (!isTwoFinger && !hasTwoFingerGesture && dt < tapTimeoutMs && dist < tapDistancePx) {
                     val s = PointerBus.get()
                     if (uiPrefs.getBoolean("haptic_trackpad_press", true)) {
                         performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)

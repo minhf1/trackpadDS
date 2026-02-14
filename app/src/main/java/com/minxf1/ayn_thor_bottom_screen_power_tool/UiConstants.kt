@@ -88,6 +88,14 @@ object UiConstants {
         const val CURSOR_FADE_MIN_MS = 250
         const val CURSOR_FADE_MAX_MS = 5000
         const val CURSOR_FADE_DEFAULT_MS = 1000
+
+        const val TRACKPAD_CLICK_TIMEOUT_MIN_MS = 50
+        const val TRACKPAD_CLICK_TIMEOUT_MAX_MS = 500
+        const val TRACKPAD_CLICK_TIMEOUT_DEFAULT_MS = 200
+
+        const val TRACKPAD_CLICK_DISTANCE_MIN_PX = 5
+        const val TRACKPAD_CLICK_DISTANCE_MAX_PX = 80
+        const val TRACKPAD_CLICK_DISTANCE_DEFAULT_PX = 20
     }
 
     // Backup file format version for settings export/import.

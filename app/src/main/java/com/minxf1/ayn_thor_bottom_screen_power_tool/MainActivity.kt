@@ -588,6 +588,34 @@ class MainActivity : ComponentActivity() {
             prefs = prefs
         ))
 
+        val trackpadClickHeader = buildSubgroupHeaderRow(
+            title = "Trackpad click sensitivity",
+            subtitle = "Tap timing and distance thresholds",
+            icon = R.drawable.ic_trackpad_click,
+            flipIcon = false
+        )
+        val trackpadClickOptions =
+            buildOptionsContainer(paddingTopDp = UiConstants.Spacing.SUBGROUP_TOP)
+        toggleVisibilityOnClick(trackpadClickHeader, trackpadClickOptions)
+        trackpadClickOptions.addView(buildIntSliderRow(
+            label = "Tap timeout (ms)",
+            key = "trackpad_click_timeout_ms",
+            prefs = prefs,
+            icon = R.drawable.ic_trackpad_click,
+            minValue = UiConstants.Sliders.TRACKPAD_CLICK_TIMEOUT_MIN_MS,
+            maxValue = UiConstants.Sliders.TRACKPAD_CLICK_TIMEOUT_MAX_MS,
+            defaultValue = UiConstants.Sliders.TRACKPAD_CLICK_TIMEOUT_DEFAULT_MS
+        ))
+        trackpadClickOptions.addView(buildIntSliderRow(
+            label = "Tap distance (px)",
+            key = "trackpad_click_distance_px",
+            prefs = prefs,
+            icon = R.drawable.ic_trackpad_click,
+            minValue = UiConstants.Sliders.TRACKPAD_CLICK_DISTANCE_MIN_PX,
+            maxValue = UiConstants.Sliders.TRACKPAD_CLICK_DISTANCE_MAX_PX,
+            defaultValue = UiConstants.Sliders.TRACKPAD_CLICK_DISTANCE_DEFAULT_PX
+        ))
+
         val lightOffHeader = buildSubgroupHeaderRow(
             title = "Light Off Mode",
             subtitle = "Behavior when the light overlay is enabled",
@@ -683,6 +711,9 @@ class MainActivity : ComponentActivity() {
         options.addView(space(UiConstants.Spacing.SMALL_GAP))
         options.addView(trackpadModeHeader)
         options.addView(trackpadModeOptions)
+        options.addView(space(UiConstants.Spacing.SMALL_GAP))
+        options.addView(trackpadClickHeader)
+        options.addView(trackpadClickOptions)
         options.addView(space(UiConstants.Spacing.SMALL_GAP))
         options.addView(lightOffHeader)
         options.addView(lightOffOptions)
