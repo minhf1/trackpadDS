@@ -1,8 +1,12 @@
-package com.example.ayn_thor_bottom_screen_power_tool
+package com.minxf1.ayn_thor_bottom_screen_power_tool
 
+import android.Manifest
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.Typeface
 import android.hardware.display.DisplayManager
 import android.net.Uri
 import android.os.Bundle
@@ -18,6 +22,9 @@ import android.widget.ImageView
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.text.InputType
+import android.util.DisplayMetrics
+import android.view.Gravity
+import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import androidx.core.net.toUri
@@ -26,11 +33,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import org.json.JSONObject
 import kotlin.math.roundToInt
 import androidx.core.content.edit
+import com.example.ayn_thor_bottom_screen_power_tool.R
+import kotlin.collections.get
+import kotlin.collections.iterator
 
 class MainActivity : ComponentActivity() {
     private var pendingStart = false
     private val sizeInputs = mutableMapOf<String, EditText>()
-    private var sizePrefListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
+    private var sizePrefListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
     private lateinit var startBtn: Button
     private val backupLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -95,7 +105,7 @@ class MainActivity : ComponentActivity() {
         setContentView(scroll)
 
         val sizePrefs = getSharedPreferences("ui_config", MODE_PRIVATE)
-        sizePrefListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        sizePrefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             val edit = sizeInputs[key] ?: return@OnSharedPreferenceChangeListener
             if (edit.hasFocus()) return@OnSharedPreferenceChangeListener
             val value = sizePrefs.getInt(key, edit.text.toString().toIntOrNull() ?: 0)
@@ -153,7 +163,7 @@ class MainActivity : ComponentActivity() {
     private fun buildPermissionNotice(): LinearLayout? {
         val overlayMissing = !Settings.canDrawOverlays(this)
         val a11yMissing = !isPointerA11yEnabled()
-        val notifMissing = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        val notifMissing = checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         if (!overlayMissing && !a11yMissing && !notifMissing) return null
 
         // Simple permission explainer card shown only when something is missing.
@@ -210,8 +220,8 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             return
         }
 
@@ -374,7 +384,7 @@ class MainActivity : ComponentActivity() {
                 UiConstants.Spacing.CARD_PADDING
             )
             setBackgroundColor(UiConstants.Colors.BANNER_BG)
-            gravity = android.view.Gravity.CENTER_VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
             setOnClickListener {
                 val uri = Uri.parse("https://ko-fi.com/minxf1")
                 startActivity(Intent(Intent.ACTION_VIEW, uri))
@@ -385,8 +395,8 @@ class MainActivity : ComponentActivity() {
                 text = "Buy me coffee if you love the app"
                 textSize = UiConstants.Text.BANNER
                 setTextColor(UiConstants.Colors.TEXT_PRIMARY)
-                gravity = android.view.Gravity.CENTER_VERTICAL
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                gravity = Gravity.CENTER_VERTICAL
+                setTypeface(typeface, Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(
                     0,
                     LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -780,7 +790,7 @@ class MainActivity : ComponentActivity() {
     private fun buildNumberInputRow(
         label: String,
         key: String,
-        prefs: android.content.SharedPreferences,
+        prefs: SharedPreferences,
         minValue: Int,
         maxValue: Int
     ): LinearLayout {
@@ -887,7 +897,7 @@ class MainActivity : ComponentActivity() {
                 textSize = UiConstants.Text.SECTION
                 text = title
                 setTextColor(UiConstants.Colors.TEXT_EMPHASIS)
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                setTypeface(typeface, Typeface.BOLD)
             }
 
             val subtitleView = TextView(this@MainActivity).apply {
@@ -906,7 +916,7 @@ class MainActivity : ComponentActivity() {
 
     // buildSizeCopyButtons.
     private fun buildSizeCopyButtons(
-        prefs: android.content.SharedPreferences
+        prefs: SharedPreferences
     ): LinearLayout {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -952,7 +962,7 @@ class MainActivity : ComponentActivity() {
     private fun copyTrackpadSize(
         fromPrefix: String,
         toPrefix: String,
-        prefs: android.content.SharedPreferences
+        prefs: SharedPreferences
     ) {
         val bounds = getTrackpadSizeBounds()
         val width = prefs.getInt("${fromPrefix}_width", dp(UiConstants.Sizes.DEFAULT_TRACKPAD_SIZE))
@@ -973,7 +983,7 @@ class MainActivity : ComponentActivity() {
         key: String,
         minValue: Int,
         maxValue: Int,
-        prefs: android.content.SharedPreferences
+        prefs: SharedPreferences
     ) {
         val raw = editText.text.toString().toIntOrNull()
         val clamped = (raw ?: minValue).coerceIn(minValue, maxValue)
@@ -1011,7 +1021,7 @@ class MainActivity : ComponentActivity() {
         val minPx = dp(UiConstants.Sizes.TRACKPAD_MIN)
         val dm = getSystemService(DISPLAY_SERVICE) as DisplayManager
         val secondary = dm.displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
-        val metrics = android.util.DisplayMetrics()
+        val metrics = DisplayMetrics()
         if (secondary != null) {
             @Suppress("DEPRECATION")
             secondary.getRealMetrics(metrics)
@@ -1080,7 +1090,7 @@ class MainActivity : ComponentActivity() {
     }
 
     // prefsToJson.
-    private fun prefsToJson(prefs: android.content.SharedPreferences): JSONObject {
+    private fun prefsToJson(prefs: SharedPreferences): JSONObject {
         val obj = JSONObject()
         for ((key, value) in prefs.all) {
             when (value) {
@@ -1097,7 +1107,7 @@ class MainActivity : ComponentActivity() {
     // applyJsonToPrefs.
     private fun applyJsonToPrefs(
         obj: JSONObject,
-        prefs: android.content.SharedPreferences
+        prefs: SharedPreferences
     ) {
         val editor = prefs.edit()
         val keys = obj.keys()
@@ -1131,7 +1141,7 @@ class MainActivity : ComponentActivity() {
     }
 
     // toggleVisibilityOnClick.
-    private fun toggleVisibilityOnClick(header: android.view.View, options: android.view.View) {
+    private fun toggleVisibilityOnClick(header: View, options: View) {
         header.setOnClickListener {
             options.visibility =
                 if (options.visibility == LinearLayout.VISIBLE) LinearLayout.GONE else LinearLayout.VISIBLE
@@ -1142,7 +1152,7 @@ class MainActivity : ComponentActivity() {
     private fun buildToggleSection(
         header: LinearLayout,
         items: List<ToggleSpec>,
-        prefs: android.content.SharedPreferences,
+        prefs: SharedPreferences,
         paddingTopDp: Int = UiConstants.Spacing.SUBGROUP_TOP
     ): LinearLayout {
         // Collapsible list of toggle rows bound to preference keys.
@@ -1159,7 +1169,7 @@ class MainActivity : ComponentActivity() {
         label: String,
         key: String,
         icon: Int,
-        prefs: android.content.SharedPreferences,
+        prefs: SharedPreferences,
         onCheckedChange: ((Boolean) -> Unit)? = null,
         flipIcon: Boolean? = null
     ): LinearLayout {
@@ -1178,7 +1188,7 @@ class MainActivity : ComponentActivity() {
         label: String,
         key: String,
         icon: Int,
-        prefs: android.content.SharedPreferences,
+        prefs: SharedPreferences,
         onCheckedChange: ((Boolean) -> Unit)? = null,
         flipIcon: Boolean? = null
     ): ToggleRow {
@@ -1218,8 +1228,8 @@ class MainActivity : ComponentActivity() {
 
         val toggle = Switch(this).apply {
             isChecked = prefs.getBoolean(key, true)
-            val enabledColor = android.content.res.ColorStateList.valueOf(UiConstants.Colors.TEXT_SECONDARY)
-            val disabledColor = android.content.res.ColorStateList.valueOf(UiConstants.Colors.BLACK)
+            val enabledColor = ColorStateList.valueOf(UiConstants.Colors.TEXT_SECONDARY)
+            val disabledColor = ColorStateList.valueOf(UiConstants.Colors.BLACK)
             thumbTintList = if (isChecked) enabledColor else disabledColor
             trackTintList = if (isChecked) enabledColor else disabledColor
             setOnCheckedChangeListener { _, isChecked ->
@@ -1248,7 +1258,7 @@ class MainActivity : ComponentActivity() {
     private fun buildSliderRow(
         label: String,
         key: String,
-        prefs: android.content.SharedPreferences
+        prefs: SharedPreferences
     ): LinearLayout {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1282,7 +1292,7 @@ class MainActivity : ComponentActivity() {
             max = UiConstants.Sliders.OPACITY_MAX
             progress = prefs.getInt(key, UiConstants.Sliders.OPACITY_DEFAULT)
             value.text = "${progress}%"
-            val gray = android.content.res.ColorStateList.valueOf(UiConstants.Colors.TEXT_SECONDARY)
+            val gray = ColorStateList.valueOf(UiConstants.Colors.TEXT_SECONDARY)
             progressTintList = gray
             thumbTintList = gray
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -1309,7 +1319,7 @@ class MainActivity : ComponentActivity() {
     private fun buildFloatSliderRow(
         label: String,
         key: String,
-        prefs: android.content.SharedPreferences,
+        prefs: SharedPreferences,
         icon: Int,
         minValue: Float,
         maxValue: Float,
@@ -1362,7 +1372,7 @@ class MainActivity : ComponentActivity() {
             val progressValue = ((stored - minValue) / (maxValue - minValue) * steps).roundToInt()
             progress = progressValue
             value.text = String.format("%.1f", stored)
-            val gray = android.content.res.ColorStateList.valueOf(UiConstants.Colors.TEXT_SECONDARY)
+            val gray = ColorStateList.valueOf(UiConstants.Colors.TEXT_SECONDARY)
             progressTintList = gray
             thumbTintList = gray
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -1392,7 +1402,7 @@ class MainActivity : ComponentActivity() {
     private fun buildIntSliderRow(
         label: String,
         key: String,
-        prefs: android.content.SharedPreferences,
+        prefs: SharedPreferences,
         icon: Int,
         minValue: Int,
         maxValue: Int,
@@ -1443,7 +1453,7 @@ class MainActivity : ComponentActivity() {
             val stored = prefs.getInt(key, defaultValue).coerceIn(minValue, maxValue)
             progress = stored - minValue
             value.text = stored.toString()
-            val gray = android.content.res.ColorStateList.valueOf(UiConstants.Colors.TEXT_SECONDARY)
+            val gray = ColorStateList.valueOf(UiConstants.Colors.TEXT_SECONDARY)
             progressTintList = gray
             thumbTintList = gray
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {

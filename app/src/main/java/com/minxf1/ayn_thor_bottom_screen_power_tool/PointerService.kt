@@ -1,4 +1,4 @@
-package com.example.ayn_thor_bottom_screen_power_tool
+package com.minxf1.ayn_thor_bottom_screen_power_tool
 
 import android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK
 import android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME
@@ -32,9 +32,16 @@ import android.widget.TextView
 import kotlin.concurrent.fixedRateTimer
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
+import android.content.SharedPreferences
+import android.os.Handler
+import android.util.DisplayMetrics
+import android.util.Log
 import androidx.core.content.IntentCompat
 import java.lang.ref.WeakReference
 import androidx.core.content.edit
+import com.example.ayn_thor_bottom_screen_power_tool.R
+import java.util.Timer
+import kotlin.math.abs
 
 class PointerService : Service() {
     private var screenReceiver: BroadcastReceiver? = null
@@ -47,7 +54,7 @@ class PointerService : Service() {
     }
     private var cursorWm: WindowManager? = null
     private var cursorLp: WindowManager.LayoutParams? = null
-    private var cursorTimer: java.util.Timer? = null
+    private var cursorTimer: Timer? = null
     private var cursorView: View? = null
     private var cursorSizePx = 0
     private var lastCursorX = 0
@@ -99,11 +106,11 @@ class PointerService : Service() {
         getSharedPreferences("floating_positions", MODE_PRIVATE)
     }
     private val uiPrefListener =
-        android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
             applyUiConfig()
         }
     private val positionPrefListener =
-        android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
             applyOverlayPositions()
         }
     private var buttonOpacity = 100
@@ -124,7 +131,7 @@ class PointerService : Service() {
     private var mirrorTouchView: View? = null
     private var mirrorTouchLp: WindowManager.LayoutParams? = null
     private var mirrorTouchWm: WindowManager? = null
-    private val mirrorTouchHandler = android.os.Handler(Looper.getMainLooper())
+    private val mirrorTouchHandler = Handler(Looper.getMainLooper())
     private val mirrorTouchHide = Runnable { hideMirrorTouch() }
     private var mirrorClickView: View? = null
     private var mirrorClickLp: WindowManager.LayoutParams? = null
@@ -133,7 +140,7 @@ class PointerService : Service() {
     private var lightPrimaryView: ImageButton? = null
     private var lightPrimaryLp: WindowManager.LayoutParams? = null
     private var lightPrimaryWm: WindowManager? = null
-    private val mainHandler = android.os.Handler(Looper.getMainLooper())
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     // onCreate.
     override fun onCreate() {
@@ -326,7 +333,7 @@ class PointerService : Service() {
                 }
             } catch (t: Throwable) {
                 // Do NOT swallow silently while debugging
-                android.util.Log.e("PointerService", "Failed to remove cursor overlay", t)
+                Log.e("PointerService", "Failed to remove cursor overlay", t)
             }
         }
 
@@ -896,7 +903,7 @@ class PointerService : Service() {
     // attachNavButtonsToSecondary.
     private fun attachNavButtonsToSecondary(
         ctx: Context,
-        metrics: android.util.DisplayMetrics
+        metrics: DisplayMetrics
     ) {
         val wm = padWm ?: return
         if (dragToggleView != null || backView != null || homeView != null || recentsView != null || closeView != null) {
@@ -1046,7 +1053,7 @@ class PointerService : Service() {
             uiPrefs.edit { putBoolean("light_off_primary_button", false) }
         }
 
-        android.util.Log.d("PointerService", "buttonOpacity $buttonOpacity")
+        Log.d("PointerService", "buttonOpacity $buttonOpacity")
 
         dragModeEnabled = uiPrefs.getBoolean("drag_mode_enabled", false)
         dragEnabled = dragModeEnabled
@@ -1380,7 +1387,7 @@ class PointerService : Service() {
         action: () -> Unit,
         wm: WindowManager,
         ctx: Context,
-        metrics: android.util.DisplayMetrics,
+        metrics: DisplayMetrics,
         allowTapWhenDragEnabled: Boolean = false,
         onLongPress: (() -> Boolean)? = null
     ) {
@@ -1547,13 +1554,13 @@ class PointerService : Service() {
                     lastY = e.rawY
 
                     if (!moved &&
-                        (kotlin.math.abs(dx) >= touchSlop || kotlin.math.abs(dy) >= touchSlop)) {
+                        (abs(dx) >= touchSlop || abs(dy) >= touchSlop)) {
                         moved = true
                     }
 
                     if (moved) {
                         val (maxX, maxY) = getDragBounds(v, lp)
-                        android.util.Log.d("PointerService","floating button bound: $maxX $maxY")
+                        Log.d("PointerService","floating button bound: $maxX $maxY")
                         val newX = (lp.x + dx).toInt().coerceIn(0, maxX.coerceAtLeast(0))
                         val newY = (lp.y + dy).toInt().coerceIn(0, maxY.coerceAtLeast(0))
                         lp.x = newX
@@ -1656,7 +1663,7 @@ class PointerService : Service() {
                         val dx = e.rawX - startRawX
                         val dy = e.rawY - startRawY
                         if (!moved &&
-                            (kotlin.math.abs(dx) >= touchSlop || kotlin.math.abs(dy) >= touchSlop)) {
+                            (abs(dx) >= touchSlop || abs(dy) >= touchSlop)) {
                             moved = true
                         }
                         if (moved) {
@@ -1710,7 +1717,7 @@ class PointerService : Service() {
                     lastY = e.rawY
 
                     if (!moved &&
-                        (kotlin.math.abs(dx) >= touchSlop || kotlin.math.abs(dy) >= touchSlop)) {
+                        (abs(dx) >= touchSlop || abs(dy) >= touchSlop)) {
                         moved = true
                     }
 
@@ -1752,11 +1759,11 @@ class PointerService : Service() {
     }
 
     // dp.
-    private fun dp(metrics: android.util.DisplayMetrics, dp: Int): Int =
+    private fun dp(metrics: DisplayMetrics, dp: Int): Int =
         (dp * metrics.density).roundToInt()
 
     // getButtonSizePx.
-    private fun getButtonSizePx(metrics: android.util.DisplayMetrics): Int {
+    private fun getButtonSizePx(metrics: DisplayMetrics): Int {
         val minPx = dp(metrics, 24)
         val maxPx = dp(metrics, 120)
         val defaultPx = dp(metrics, 44)
@@ -1766,7 +1773,7 @@ class PointerService : Service() {
     // updateFloatingButtonSizes.
     private fun updateFloatingButtonSizes(
         wm: WindowManager,
-        metrics: android.util.DisplayMetrics
+        metrics: DisplayMetrics
     ) {
         val sizePx = getButtonSizePx(metrics)
         updateButtonSizeFor(wm, backView, backLp, sizePx)
@@ -2210,7 +2217,7 @@ class PointerService : Service() {
                     lastY = e.rawY
 
                     if (!moved &&
-                        (kotlin.math.abs(dx) >= touchSlop || kotlin.math.abs(dy) >= touchSlop)) {
+                        (abs(dx) >= touchSlop || abs(dy) >= touchSlop)) {
                         moved = true
                     }
 
@@ -2294,7 +2301,7 @@ class PointerService : Service() {
     // getDragBounds.
     private fun getDragBounds(v: View, lp: WindowManager.LayoutParams): Pair<Int, Int> {
         val display = v.display
-        val metrics = android.util.DisplayMetrics()
+        val metrics = DisplayMetrics()
         if (display != null) {
             @Suppress("DEPRECATION")
             display.getRealMetrics(metrics)
@@ -2311,7 +2318,7 @@ class PointerService : Service() {
     // getDisplaySize.
     private fun getDisplaySize(v: View): Pair<Int, Int> {
         val display = v.display
-        val metrics = android.util.DisplayMetrics()
+        val metrics = DisplayMetrics()
         if (display != null) {
             @Suppress("DEPRECATION")
             display.getRealMetrics(metrics)
@@ -2324,7 +2331,7 @@ class PointerService : Service() {
     // applyTrackpadSizes.
     private fun applyTrackpadSizes(
         wm: WindowManager,
-        metrics: android.util.DisplayMetrics
+        metrics: DisplayMetrics
     ) {
         updateTrackpadSize(padViewA, padLpA, "trackpad_right", wm, metrics)
         updateTrackpadSize(padViewB, padLpB, "trackpad_left", wm, metrics)
@@ -2336,7 +2343,7 @@ class PointerService : Service() {
         lp: WindowManager.LayoutParams?,
         sizeKey: String,
         wm: WindowManager,
-        metrics: android.util.DisplayMetrics
+        metrics: DisplayMetrics
     ) {
         if (view == null || lp == null) return
         val defaultW = dp(metrics, 200)
@@ -2370,7 +2377,7 @@ class PointerService : Service() {
 
     // clampTrackpadSize.
     private fun clampTrackpadSize(
-        metrics: android.util.DisplayMetrics,
+        metrics: DisplayMetrics,
         width: Int,
         height: Int
     ): Pair<Int, Int> {
@@ -2540,7 +2547,7 @@ class PointerService : Service() {
         }
 
         if (primary != null) {
-            val metrics = android.util.DisplayMetrics()
+            val metrics = DisplayMetrics()
             @Suppress("DEPRECATION")
             primary.getRealMetrics(metrics)
             return metrics.widthPixels to metrics.heightPixels

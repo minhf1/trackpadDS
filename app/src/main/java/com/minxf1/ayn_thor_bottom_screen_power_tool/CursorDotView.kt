@@ -1,4 +1,4 @@
-package com.example.ayn_thor_bottom_screen_power_tool
+package com.minxf1.ayn_thor_bottom_screen_power_tool
 
 import android.content.Context
 import android.graphics.Canvas
@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.util.AttributeSet
 import android.view.View
+import android.view.ViewGroup
 import kotlin.math.min
 
 internal class CursorDotView @JvmOverloads constructor(
@@ -31,7 +32,7 @@ internal class CursorDotView @JvmOverloads constructor(
 
     // Constructor for programmatic sizing.
     constructor(ctx: Context, sizePx: Int) : this(ctx) {
-        layoutParams = android.view.ViewGroup.LayoutParams(sizePx, sizePx)
+        layoutParams = ViewGroup.LayoutParams(sizePx, sizePx)
     }
 
     // Updates scroll direction indicator and triggers redraw if changed.

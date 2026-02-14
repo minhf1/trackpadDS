@@ -1,13 +1,13 @@
-package com.example.ayn_thor_bottom_screen_power_tool
+package com.minxf1.ayn_thor_bottom_screen_power_tool
 
-import android.util.Log
+import android.content.Context
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import kotlin.math.abs
 
-class TrackpadView(ctx: android.content.Context) : View(ctx) {
-    private val uiPrefs = ctx.getSharedPreferences("ui_config", android.content.Context.MODE_PRIVATE)
+class TrackpadView(ctx: Context) : View(ctx) {
+    private val uiPrefs = ctx.getSharedPreferences("ui_config", Context.MODE_PRIVATE)
     private var lastX = 0f
     private var lastY = 0f
 
@@ -183,8 +183,8 @@ class TrackpadView(ctx: android.content.Context) : View(ctx) {
                     scrollAccumulatorY += filteredScrollY
 
                     // Threshold to avoid micro-scroll spam
-                    if (kotlin.math.abs(scrollAccumulatorX) >= scrollThreshold ||
-                        kotlin.math.abs(scrollAccumulatorY) >= scrollThreshold) {
+                    if (abs(scrollAccumulatorX) >= scrollThreshold ||
+                        abs(scrollAccumulatorY) >= scrollThreshold) {
 
                         // Treat scroll as vector (dx, dy)
                         val (mappedDx, mappedDy) =
@@ -194,7 +194,7 @@ class TrackpadView(ctx: android.content.Context) : View(ctx) {
                                 scrollAccumulatorY
                             )
 
-                        val useHorizontal = kotlin.math.abs(mappedDx) >= kotlin.math.abs(mappedDy)
+                        val useHorizontal = abs(mappedDx) >= abs(mappedDy)
                         val scrollMultiplier =
                             uiPrefs.getInt("scroll_sensitivity", 40).coerceIn(1, 100).toFloat()
                         val scrollDeltaX = if (useHorizontal) mappedDx * scrollMultiplier else 0f

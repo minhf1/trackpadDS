@@ -1,11 +1,7 @@
-package com.example.ayn_thor_bottom_screen_power_tool
+package com.minxf1.ayn_thor_bottom_screen_power_tool
 
 import android.os.Bundle
-import android.util.Log
-import android.view.MotionEvent
-import android.view.View
 import androidx.activity.ComponentActivity
-import kotlin.math.abs
 
 class TrackpadActivity : ComponentActivity() {
 

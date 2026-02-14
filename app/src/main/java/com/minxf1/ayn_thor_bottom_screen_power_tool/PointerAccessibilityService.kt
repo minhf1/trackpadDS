@@ -1,4 +1,4 @@
-package com.example.ayn_thor_bottom_screen_power_tool
+package com.minxf1.ayn_thor_bottom_screen_power_tool
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
@@ -237,8 +237,8 @@ class PointerAccessibilityService : AccessibilityService() {
         // For "scroll down", typical gesture is finger swipes up.
         val maxX = (displayW - 1).toFloat()
         val maxY = (displayH - 1).toFloat()
-        val spanX = kotlin.math.abs(magnitudeX)
-        val spanY = kotlin.math.abs(magnitudeY)
+        val spanX = abs(magnitudeX)
+        val spanY = abs(magnitudeY)
 
         val minSpan = 48f
         val safeMargin = 24f

@@ -1,10 +1,11 @@
-package com.example.ayn_thor_bottom_screen_power_tool
+package com.minxf1.ayn_thor_bottom_screen_power_tool
 
 import android.app.ActivityOptions
 import android.content.Intent
 import android.hardware.display.DisplayManager
 import android.media.projection.MediaProjectionManager
 import android.os.Bundle
+import android.view.Display
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 
@@ -47,7 +48,7 @@ class MirrorPermissionActivity : ComponentActivity() {
         }
         val dm = getSystemService(DisplayManager::class.java)
         val secondary = dm.displays.firstOrNull {
-            it.displayId != android.view.Display.DEFAULT_DISPLAY
+            it.displayId != Display.DEFAULT_DISPLAY
         }
         // Prefer secondary display when present; otherwise fall back to the primary display.
         if (secondary != null) {

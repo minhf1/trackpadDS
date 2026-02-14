@@ -1,4 +1,4 @@
-package com.example.ayn_thor_bottom_screen_power_tool
+package com.minxf1.ayn_thor_bottom_screen_power_tool
 
 object UiConstants {
     // Spacing values are dp unless otherwise noted.

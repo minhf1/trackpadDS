@@ -1,4 +1,4 @@
-package com.example.ayn_thor_bottom_screen_power_tool
+package com.minxf1.ayn_thor_bottom_screen_power_tool
 
 import android.os.SystemClock
 import java.util.concurrent.atomic.AtomicReference

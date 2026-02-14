@@ -1,22 +1,31 @@
-package com.example.ayn_thor_bottom_screen_power_tool
+package com.minxf1.ayn_thor_bottom_screen_power_tool
 
+import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.hardware.display.DisplayManager
 import android.os.Bundle
+import android.util.DisplayMetrics
+import android.view.Display
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
+import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.view.View
 import android.view.ViewGroup
 import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import androidx.core.content.edit
+import com.example.ayn_thor_bottom_screen_power_tool.R
+import kotlin.math.abs
 
 class MirrorActivity : Activity() {
     private var primaryW = 0
@@ -41,8 +50,8 @@ class MirrorActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         // Resolve primary display metrics for touch mapping.
-        val dm = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-        val primary = dm.getDisplay(android.view.Display.DEFAULT_DISPLAY)
+        val dm = getSystemService(DISPLAY_SERVICE) as DisplayManager
+        val primary = dm.getDisplay(Display.DEFAULT_DISPLAY)
         val (realW, realH) = getPrimaryRealSize(primary)
         primaryW = realW
         primaryH = realH
@@ -51,9 +60,11 @@ class MirrorActivity : Activity() {
         val root = FrameLayout(this).apply {
             setBackgroundColor(UiConstants.Colors.BLACK)
         }
-        val uiPrefs = getSharedPreferences(MirrorConstants.Prefs.UI, Context.MODE_PRIVATE)
+        val uiPrefs = getSharedPreferences(MirrorConstants.Prefs.UI, MODE_PRIVATE)
         mirrorRenderClick = uiPrefs.getBoolean(MirrorConstants.Prefs.RENDER_CLICK, true)
-        mirrorDragEnabled = getSharedPreferences(MirrorConstants.Prefs.MIRROR_POSITIONS, Context.MODE_PRIVATE)
+        mirrorDragEnabled = getSharedPreferences(MirrorConstants.Prefs.MIRROR_POSITIONS,
+            MODE_PRIVATE
+        )
             .getBoolean(MirrorConstants.Prefs.DRAG_ENABLED, false)
         // Cast container draws a border around the mirrored content.
         val castContainer = FrameLayout(this).apply {
@@ -195,7 +206,7 @@ class MirrorActivity : Activity() {
                 MirrorConstants.ButtonIndex.BACK
             ) {
                 PointerAccessibilityService.instance?.performGlobalAction(
-                    android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK
+                    AccessibilityService.GLOBAL_ACTION_BACK
                 )
             }
             root.addView(backButton)
@@ -208,7 +219,7 @@ class MirrorActivity : Activity() {
                 MirrorConstants.ButtonIndex.HOME
             ) {
                 PointerAccessibilityService.instance?.performGlobalAction(
-                    android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME
+                    AccessibilityService.GLOBAL_ACTION_HOME
                 )
             }
             root.addView(homeButton)
@@ -221,7 +232,7 @@ class MirrorActivity : Activity() {
                 MirrorConstants.ButtonIndex.RECENTS
             ) {
                 PointerAccessibilityService.instance?.performGlobalAction(
-                    android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_RECENTS
+                    AccessibilityService.GLOBAL_ACTION_RECENTS
                 )
             }
             root.addView(recentsButton)
@@ -241,20 +252,20 @@ class MirrorActivity : Activity() {
         updateMirrorDragAppearance()
 
         // Attach/detach the mirror surface in the service.
-        surfaceView.holder.addCallback(object : android.view.SurfaceHolder.Callback {
+        surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
             // surfaceCreated.
-            override fun surfaceCreated(holder: android.view.SurfaceHolder) {
+            override fun surfaceCreated(holder: SurfaceHolder) {
                 PointerService.instance?.attachMirrorSurface(holder.surface)
             }
             // surfaceChanged.
             override fun surfaceChanged(
-                holder: android.view.SurfaceHolder,
+                holder: SurfaceHolder,
                 format: Int,
                 width: Int,
                 height: Int
             ) {}
             // surfaceDestroyed.
-            override fun surfaceDestroyed(holder: android.view.SurfaceHolder) {
+            override fun surfaceDestroyed(holder: SurfaceHolder) {
                 PointerService.instance?.detachMirrorSurface()
             }
         })
@@ -314,7 +325,7 @@ class MirrorActivity : Activity() {
         action: () -> Unit
     ): ImageButton {
         val sizePx = getButtonSizePx()
-        val uiPrefs = getSharedPreferences(MirrorConstants.Prefs.UI, Context.MODE_PRIVATE)
+        val uiPrefs = getSharedPreferences(MirrorConstants.Prefs.UI, MODE_PRIVATE)
         val button = ImageButton(this).apply {
             tag = key
             layoutParams = FrameLayout.LayoutParams(sizePx, sizePx).apply {
@@ -329,7 +340,7 @@ class MirrorActivity : Activity() {
             scaleType = ImageView.ScaleType.CENTER
             setOnClickListener {
                 if (uiPrefs.getBoolean(MirrorConstants.Prefs.HAPTIC_BUTTONS, true)) {
-                    performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                    performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                 }
                 action()
             }
@@ -352,7 +363,7 @@ class MirrorActivity : Activity() {
         key: String,
         index: Int
     ) {
-        val prefs = getSharedPreferences(MirrorConstants.Prefs.MIRROR_POSITIONS, Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(MirrorConstants.Prefs.MIRROR_POSITIONS, MODE_PRIVATE)
         val sizePx = getButtonSizePx()
         val gapPx = dp(MirrorConstants.Layout.BUTTON_GAP_DP)
         val margin = dp(MirrorConstants.Layout.BUTTON_MARGIN_DP)
@@ -388,7 +399,7 @@ class MirrorActivity : Activity() {
     // toggleMirrorDrag.
     private fun toggleMirrorDrag() {
         mirrorDragEnabled = !mirrorDragEnabled
-        getSharedPreferences(MirrorConstants.Prefs.MIRROR_POSITIONS, Context.MODE_PRIVATE)
+        getSharedPreferences(MirrorConstants.Prefs.MIRROR_POSITIONS, MODE_PRIVATE)
             .edit {
                 putBoolean(MirrorConstants.Prefs.DRAG_ENABLED, mirrorDragEnabled)
             }
@@ -410,14 +421,14 @@ class MirrorActivity : Activity() {
         private val key: String,
         private val view: ImageButton,
         private val allowTapWhenDragEnabled: Boolean
-    ) : android.view.View.OnTouchListener {
+    ) : View.OnTouchListener {
         private var lastX = 0f
         private var lastY = 0f
         private var moved = false
         private var touchSlop = 0
 
         // onTouch.
-        override fun onTouch(v: android.view.View, e: MotionEvent): Boolean {
+        override fun onTouch(v: View, e: MotionEvent): Boolean {
             val lp = view.layoutParams as FrameLayout.LayoutParams
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
@@ -439,7 +450,7 @@ class MirrorActivity : Activity() {
                     lastX = e.rawX
                     lastY = e.rawY
                     if (!moved &&
-                        (kotlin.math.abs(dx) >= touchSlop || kotlin.math.abs(dy) >= touchSlop)) {
+                        (abs(dx) >= touchSlop || abs(dy) >= touchSlop)) {
                         moved = true
                     }
                     if (moved) {
@@ -464,7 +475,9 @@ class MirrorActivity : Activity() {
                         return true
                     }
                     if (moved) {
-                        val prefs = getSharedPreferences(MirrorConstants.Prefs.MIRROR_POSITIONS, Context.MODE_PRIVATE)
+                        val prefs = getSharedPreferences(MirrorConstants.Prefs.MIRROR_POSITIONS,
+                            MODE_PRIVATE
+                        )
                         prefs.edit {
                             putInt("${key}_x", lp.leftMargin)
                                 .putInt("${key}_y", lp.topMargin)
@@ -499,7 +512,7 @@ class MirrorActivity : Activity() {
     // updateGestureExclusion.
     private fun updateGestureExclusion(root: FrameLayout) {
         val excludeWidth = dp(MirrorConstants.Layout.GESTURE_EXCLUSION_WIDTH_DP)
-        val rect = android.graphics.Rect(
+        val rect = Rect(
             root.width - excludeWidth,
             0,
             root.width,
@@ -509,12 +522,12 @@ class MirrorActivity : Activity() {
     }
 
     // getCastRect.
-    private fun getCastRect(castContainer: FrameLayout): android.graphics.RectF {
+    private fun getCastRect(castContainer: FrameLayout): RectF {
         val location = IntArray(2)
         castContainer.getLocationOnScreen(location)
         val left = location[0].toFloat()
         val top = location[1].toFloat()
-        return android.graphics.RectF(
+        return RectF(
             left,
             top,
             left + castContainer.width,
@@ -523,9 +536,9 @@ class MirrorActivity : Activity() {
     }
 
     // getPrimaryRealSize.
-    private fun getPrimaryRealSize(primary: android.view.Display?): Pair<Int, Int> {
+    private fun getPrimaryRealSize(primary: Display?): Pair<Int, Int> {
         if (primary != null) {
-            val metrics = android.util.DisplayMetrics()
+            val metrics = DisplayMetrics()
             @Suppress("DEPRECATION")
             primary.getRealMetrics(metrics)
             return metrics.widthPixels to metrics.heightPixels
@@ -541,7 +554,7 @@ class MirrorActivity : Activity() {
 
     // getButtonSizePx.
     private fun getButtonSizePx(): Int {
-        val prefs = getSharedPreferences(MirrorConstants.Prefs.UI, Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(MirrorConstants.Prefs.UI, MODE_PRIVATE)
         val minPx = dp(UiConstants.Sizes.BUTTON_MIN)
         val maxPx = dp(UiConstants.Sizes.BUTTON_MAX)
         val defaultPx = dp(UiConstants.Sizes.BUTTON_DEFAULT)
