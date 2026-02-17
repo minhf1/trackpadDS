@@ -13,9 +13,16 @@ class TrackpadView(ctx: Context) : View(ctx) {
     private var downTime = 0L
     private var downX = 0f
     private var downY = 0f
+    private var activePointerCount = 0
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
-        if (e.pointerCount != 1) {
+        activePointerCount = when (e.actionMasked) {
+            MotionEvent.ACTION_POINTER_UP -> (e.pointerCount - 1).coerceAtLeast(0)
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> 0
+            else -> e.pointerCount
+        }
+
+        if (activePointerCount <= 0 || activePointerCount >= 3) {
             return true
         }
 
