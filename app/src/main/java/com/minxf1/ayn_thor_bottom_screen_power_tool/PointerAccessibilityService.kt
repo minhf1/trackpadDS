@@ -33,6 +33,13 @@ class PointerAccessibilityService : AccessibilityService() {
 
     private val lastTopByDisplay = mutableMapOf<Int, ComponentName>()
 
+    private fun clampToDisplay(x: Float, y: Float): Pair<Float, Float> {
+        val s = PointerBus.get()
+        val maxX = (s.displayW - 1).coerceAtLeast(0).toFloat()
+        val maxY = (s.displayH - 1).coerceAtLeast(0).toFloat()
+        return Pair(x.coerceIn(0f, maxX), y.coerceIn(0f, maxY))
+    }
+
     override fun onServiceConnected() {
         instance = this
     }
@@ -126,10 +133,11 @@ class PointerAccessibilityService : AccessibilityService() {
     }
 
     fun touchHoldDown(x: Float, y: Float) {
+        val (cx, cy) = clampToDisplay(x, y)
         val now = SystemClock.uptimeMillis()
         val path = Path().apply {
-            moveTo(x, y)
-            lineTo(x + 0.1f, y + 0.1f)
+            moveTo(cx, cy)
+            lineTo(cx + 0.1f, cy + 0.1f)
         }
         // Fix this function - bounding box not correct
         val stroke = GestureDescription.StrokeDescription(
@@ -139,27 +147,28 @@ class PointerAccessibilityService : AccessibilityService() {
             true
         )
         holdStroke = stroke
-        holdLastX = x
-        holdLastY = y
+        holdLastX = cx
+        holdLastY = cy
         holdLastEventMs = now
         holdHasPending = false
         dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
     }
 
     fun touchHoldMove(x: Float, y: Float) {
+        val (cx, cy) = clampToDisplay(x, y)
         val current = holdStroke ?: run {
-            touchHoldDown(x, y)
+            touchHoldDown(cx, cy)
             return
         }
         val now = SystemClock.uptimeMillis()
         if (now - holdLastEventMs < holdDispatchIntervalMs) {
-            holdPendingX = x
-            holdPendingY = y
+            holdPendingX = cx
+            holdPendingY = cy
             holdHasPending = true
             return
         }
-        val endX = if (holdHasPending) holdPendingX else x
-        val endY = if (holdHasPending) holdPendingY else y
+        val endX = if (holdHasPending) holdPendingX else cx
+        val endY = if (holdHasPending) holdPendingY else cy
         holdHasPending = false
         val duration = (now - holdLastEventMs)
             .coerceAtLeast(holdMinSegmentMs)
@@ -177,10 +186,11 @@ class PointerAccessibilityService : AccessibilityService() {
     }
 
     fun touchHoldUp(x: Float, y: Float) {
+        val (cx, cy) = clampToDisplay(x, y)
         val current = holdStroke ?: return
         val now = SystemClock.uptimeMillis()
-        val endX = if (holdHasPending) holdPendingX else x
-        val endY = if (holdHasPending) holdPendingY else y
+        val endX = if (holdHasPending) holdPendingX else cx
+        val endY = if (holdHasPending) holdPendingY else cy
         holdHasPending = false
         val duration = (now - holdLastEventMs)
             .coerceAtLeast(holdMinSegmentMs)

@@ -17,10 +17,16 @@ object PointerBus {
         stateRef.set(s.copy(displayW = w, displayH = h, x = s.x.coerceIn(0f, (w - 1).toFloat()), y = s.y.coerceIn(0f, (h - 1).toFloat())))
     }
 
-    fun moveBy(dx: Float, dy: Float) {
+    fun computeMoveBy(dx: Float, dy: Float): Pair<Float, Float> {
         val s = stateRef.get()
         val nx = (s.x + dx).coerceIn(0f, (s.displayW - 1).toFloat())
         val ny = (s.y + dy).coerceIn(0f, (s.displayH - 1).toFloat())
+        return Pair(nx, ny)
+    }
+
+    fun moveBy(dx: Float, dy: Float) {
+        val s = stateRef.get()
+        val (nx, ny) = computeMoveBy(dx, dy)
         stateRef.set(s.copy(x = nx, y = ny))
     }
 

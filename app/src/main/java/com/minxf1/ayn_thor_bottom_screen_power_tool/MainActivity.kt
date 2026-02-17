@@ -548,7 +548,7 @@ class MainActivity : ComponentActivity() {
             maxValue = UiConstants.Sliders.CURSOR_SENSITIVITY_MAX,
             defaultValue = UiConstants.Sliders.CURSOR_SENSITIVITY_DEFAULT
         ))
-        trackpadOptions.addView(buildIntSliderRow(
+        trackpadOptions.addView(buildFloatSliderRow(
             label = "Scroll sensitivity",
             key = "scroll_sensitivity",
             prefs = prefs,

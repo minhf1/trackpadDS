@@ -81,9 +81,9 @@ object UiConstants {
         const val CURSOR_SENSITIVITY_MAX = 6f
         const val CURSOR_SENSITIVITY_DEFAULT = 4.5f
 
-        const val SCROLL_SENSITIVITY_MIN = 1
-        const val SCROLL_SENSITIVITY_MAX = 100
-        const val SCROLL_SENSITIVITY_DEFAULT = 40
+        const val SCROLL_SENSITIVITY_MIN = 1f
+        const val SCROLL_SENSITIVITY_MAX = 4f
+        const val SCROLL_SENSITIVITY_DEFAULT = 2f
 
         const val CURSOR_FADE_MIN_MS = 250
         const val CURSOR_FADE_MAX_MS = 5000

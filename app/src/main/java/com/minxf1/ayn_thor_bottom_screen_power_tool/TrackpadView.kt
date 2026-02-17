@@ -4,12 +4,17 @@ import android.content.Context
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import com.minxf1.ayn_thor_bottom_screen_power_tool.UiConstants.Sliders.SCROLL_SENSITIVITY_DEFAULT
+import com.minxf1.ayn_thor_bottom_screen_power_tool.UiConstants.Sliders.SCROLL_SENSITIVITY_MAX
+import com.minxf1.ayn_thor_bottom_screen_power_tool.UiConstants.Sliders.SCROLL_SENSITIVITY_MIN
 import kotlin.math.abs
 
 class TrackpadView(ctx: Context) : View(ctx) {
     private val uiPrefs = ctx.getSharedPreferences("ui_config", Context.MODE_PRIVATE)
-    private var lastX = 0f
-    private var lastY = 0f
+    private var primaryLastX = 0f
+    private var primaryLastY = 0f
+    private var secondaryLastX = 0f
+    private var secondaryLastY = 0f
     private var downTime = 0L
     private var downX = 0f
     private var downY = 0f
@@ -19,6 +24,7 @@ class TrackpadView(ctx: Context) : View(ctx) {
     private var secondaryDownTime = 0L
     private var secondaryDownX = 0f
     private var secondaryDownY = 0f
+    private var isSecondaryHoldActive = false
 
     private fun isTapClick(
         upTime: Long,
@@ -42,8 +48,10 @@ class TrackpadView(ctx: Context) : View(ctx) {
     }
 
     private fun resetState() {
-        lastX = 0f
-        lastY = 0f
+        primaryLastX = 0f
+        primaryLastY = 0f
+        secondaryLastX = 0f
+        secondaryLastY = 0f
         downTime = 0L
         downX = 0f
         downY = 0f
@@ -52,6 +60,7 @@ class TrackpadView(ctx: Context) : View(ctx) {
         secondaryDownTime = 0L
         secondaryDownX = 0f
         secondaryDownY = 0f
+        isSecondaryHoldActive = false
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
@@ -67,8 +76,8 @@ class TrackpadView(ctx: Context) : View(ctx) {
 
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                lastX = e.x
-                lastY = e.y
+                primaryLastX = e.x
+                primaryLastY = e.y
                 downTime = e.eventTime
                 downX = e.x
                 downY = e.y
@@ -84,27 +93,56 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     secondaryDownTime = e.eventTime
                     secondaryDownX = e.getX(e.actionIndex)
                     secondaryDownY = e.getY(e.actionIndex)
+                    secondaryLastX = secondaryDownX
+                    secondaryLastY = secondaryDownY
+                    val s = PointerBus.get()
+                    PointerAccessibilityService.instance?.touchHoldDown(s.x, s.y)
+                    isSecondaryHoldActive = true
                 }
                 return true
             }
 
             MotionEvent.ACTION_MOVE -> {
-                val primaryId = primaryPointerId ?: return true
-                val primaryIndex = e.findPointerIndex(primaryId)
-                if (primaryIndex < 0) {
+                val controlId = if (isSecondaryHoldActive) {
+                    secondaryPointerId
+                } else {
+                    primaryPointerId
+                } ?: return true
+                val controlIndex = e.findPointerIndex(controlId)
+                if (controlIndex < 0) {
                     return true
                 }
-                val sensitivity =
+                val sensitivity = if (isSecondaryHoldActive) {
+                    uiPrefs.getFloat("scroll_sensitivity", SCROLL_SENSITIVITY_DEFAULT).coerceIn(
+                        SCROLL_SENSITIVITY_MIN, SCROLL_SENSITIVITY_MAX
+                    )
+                } else {
                     uiPrefs.getFloat("cursor_sensitivity", 4.5f).coerceIn(0.5f, 6f)
-                val x = e.getX(primaryIndex)
-                val y = e.getY(primaryIndex)
-                val dxRaw = (x - lastX) * sensitivity
-                val dyRaw = (y - lastY) * sensitivity
-                lastX = x
-                lastY = y
+                }
+                val x = e.getX(controlIndex)
+                val y = e.getY(controlIndex)
+                val (lastXRef, lastYRef) = if (isSecondaryHoldActive) {
+                    Pair(secondaryLastX, secondaryLastY)
+                } else {
+                    Pair(primaryLastX, primaryLastY)
+                }
+                val dxRaw = (x - lastXRef) * sensitivity
+                val dyRaw = (y - lastYRef) * sensitivity
+                if (isSecondaryHoldActive) {
+                    secondaryLastX = x
+                    secondaryLastY = y
+                } else {
+                    primaryLastX = x
+                    primaryLastY = y
+                }
                 val (dx, dy) = RotationUtil.mapDeltaForRotation(4, dxRaw, dyRaw)
 
                 PointerBus.moveBy(dx, dy)
+                val secondaryId = secondaryPointerId
+                if (secondaryId != null) {
+                    val s = PointerBus.get()
+                    PointerAccessibilityService.instance?.touchHoldMove(s.x, s.y)
+                }
                 return true
             }
 
@@ -123,31 +161,22 @@ class TrackpadView(ctx: Context) : View(ctx) {
             MotionEvent.ACTION_POINTER_UP -> {
                 val pointerId = e.getPointerId(e.actionIndex)
                 if (pointerId == secondaryPointerId) {
-                    val multiTouchClickEnabled =
-                        uiPrefs.getBoolean("trackpad_click_multitouch", true)
-                    if (multiTouchClickEnabled && isTapClick(
-                            e.eventTime,
-                            e.getX(e.actionIndex),
-                            e.getY(e.actionIndex),
-                            secondaryDownTime,
-                            secondaryDownX,
-                            secondaryDownY
-                        )) {
-                        val s = PointerBus.get()
-                        if (uiPrefs.getBoolean("haptic_trackpad_press", true)) {
-                            performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                        }
-                        PointerAccessibilityService.instance?.clickAt(s.x, s.y)
-                    }
+                    val s = PointerBus.get()
+                    PointerAccessibilityService.instance?.touchHoldUp(s.x, s.y)
                     secondaryPointerId = null
+                    isSecondaryHoldActive = false
                 } else if (pointerId == primaryPointerId) {
                     primaryPointerId = secondaryPointerId
                     if (primaryPointerId != null) {
                         val nextIndex = e.findPointerIndex(primaryPointerId!!)
                         if (nextIndex >= 0) {
-                            lastX = e.getX(nextIndex)
-                            lastY = e.getY(nextIndex)
+                            primaryLastX = e.getX(nextIndex)
+                            primaryLastY = e.getY(nextIndex)
                         }
+                    }
+                    if (primaryPointerId == secondaryPointerId) {
+                        primaryLastX = secondaryLastX
+                        primaryLastY = secondaryLastY
                     }
                     secondaryPointerId = null
                 }
