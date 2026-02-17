@@ -19,17 +19,17 @@ class PointerAccessibilityService : AccessibilityService() {
             private set
     }
 
-    private var mirrorStroke: GestureDescription.StrokeDescription? = null
-    private var mirrorLastX = 0f
-    private var mirrorLastY = 0f
-    private var mirrorLastEventMs = 0L
-    private val mirrorHoldDurationMs = 10_000L
-    private val mirrorMinSegmentMs = 4L
-    private val mirrorMaxSegmentMs = 12L
-    private val mirrorDispatchIntervalMs = 6L
-    private var mirrorPendingX = 0f
-    private var mirrorPendingY = 0f
-    private var mirrorHasPending = false
+    private var holdStroke: GestureDescription.StrokeDescription? = null
+    private var holdLastX = 0f
+    private var holdLastY = 0f
+    private var holdLastEventMs = 0L
+    private val holdDurationMs = 10_000L
+    private val holdMinSegmentMs = 4L
+    private val holdMaxSegmentMs = 12L
+    private val holdDispatchIntervalMs = 6L
+    private var holdPendingX = 0f
+    private var holdPendingY = 0f
+    private var holdHasPending = false
 
     private val lastTopByDisplay = mutableMapOf<Int, ComponentName>()
 
@@ -125,7 +125,7 @@ class PointerAccessibilityService : AccessibilityService() {
         dispatchGesture(gesture, null, null)
     }
 
-    fun mirrorTouchDown(x: Float, y: Float) {
+    fun touchHoldDown(x: Float, y: Float) {
         val now = SystemClock.uptimeMillis()
         val path = Path().apply {
             moveTo(x, y)
@@ -135,71 +135,71 @@ class PointerAccessibilityService : AccessibilityService() {
         val stroke = GestureDescription.StrokeDescription(
             path,
             0,
-            mirrorHoldDurationMs,
+            holdDurationMs,
             true
         )
-        mirrorStroke = stroke
-        mirrorLastX = x
-        mirrorLastY = y
-        mirrorLastEventMs = now
-        mirrorHasPending = false
+        holdStroke = stroke
+        holdLastX = x
+        holdLastY = y
+        holdLastEventMs = now
+        holdHasPending = false
         dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
     }
 
-    fun mirrorTouchMove(x: Float, y: Float) {
-        val current = mirrorStroke ?: run {
-            mirrorTouchDown(x, y)
+    fun touchHoldMove(x: Float, y: Float) {
+        val current = holdStroke ?: run {
+            touchHoldDown(x, y)
             return
         }
         val now = SystemClock.uptimeMillis()
-        if (now - mirrorLastEventMs < mirrorDispatchIntervalMs) {
-            mirrorPendingX = x
-            mirrorPendingY = y
-            mirrorHasPending = true
+        if (now - holdLastEventMs < holdDispatchIntervalMs) {
+            holdPendingX = x
+            holdPendingY = y
+            holdHasPending = true
             return
         }
-        val endX = if (mirrorHasPending) mirrorPendingX else x
-        val endY = if (mirrorHasPending) mirrorPendingY else y
-        mirrorHasPending = false
-        val duration = (now - mirrorLastEventMs)
-            .coerceAtLeast(mirrorMinSegmentMs)
-            .coerceAtMost(mirrorMaxSegmentMs)
+        val endX = if (holdHasPending) holdPendingX else x
+        val endY = if (holdHasPending) holdPendingY else y
+        holdHasPending = false
+        val duration = (now - holdLastEventMs)
+            .coerceAtLeast(holdMinSegmentMs)
+            .coerceAtMost(holdMaxSegmentMs)
         val path = Path().apply {
-            moveTo(mirrorLastX, mirrorLastY)
+            moveTo(holdLastX, holdLastY)
             lineTo(endX, endY)
         }
         val next = current.continueStroke(path, 0, duration, true)
-        mirrorStroke = next
-        mirrorLastX = endX
-        mirrorLastY = endY
-        mirrorLastEventMs = now
+        holdStroke = next
+        holdLastX = endX
+        holdLastY = endY
+        holdLastEventMs = now
         dispatchGesture(GestureDescription.Builder().addStroke(next).build(), null, null)
     }
 
-    fun mirrorTouchUp(x: Float, y: Float) {
-        val current = mirrorStroke ?: return
+    fun touchHoldUp(x: Float, y: Float) {
+        val current = holdStroke ?: return
         val now = SystemClock.uptimeMillis()
-        val endX = if (mirrorHasPending) mirrorPendingX else x
-        val endY = if (mirrorHasPending) mirrorPendingY else y
-        mirrorHasPending = false
-        val duration = (now - mirrorLastEventMs)
-            .coerceAtLeast(mirrorMinSegmentMs)
-            .coerceAtMost(mirrorMaxSegmentMs)
+        val endX = if (holdHasPending) holdPendingX else x
+        val endY = if (holdHasPending) holdPendingY else y
+        holdHasPending = false
+        val duration = (now - holdLastEventMs)
+            .coerceAtLeast(holdMinSegmentMs)
+            .coerceAtMost(holdMaxSegmentMs)
         val path = Path().apply {
-            moveTo(mirrorLastX, mirrorLastY)
+            moveTo(holdLastX, holdLastY)
             lineTo(endX, endY)
         }
         val next = current.continueStroke(path, 0, duration, false)
-        mirrorStroke = null
-        mirrorLastEventMs = 0L
-        mirrorHasPending = false
+        holdStroke = null
+        holdLastEventMs = 0L
+        holdHasPending = false
         dispatchGesture(GestureDescription.Builder().addStroke(next).build(), null, null)
     }
 
-    fun mirrorTouchCancel() {
-        mirrorStroke = null
-        mirrorLastEventMs = 0L
-        mirrorHasPending = false
+    fun touchHoldCancel() {
+        holdStroke = null
+        holdLastEventMs = 0L
+        holdHasPending = false
     }
 
     fun focusPrimaryBySwipe(displayW: Int, displayH: Int) {
@@ -268,3 +268,4 @@ class PointerAccessibilityService : AccessibilityService() {
         dispatchGesture(gesture, null, null)
     }
 }
+

@@ -118,7 +118,7 @@ class MirrorActivity : Activity() {
                         mirrorDownTimeMs = event.eventTime
                         mirrorMoved = false
                         // Begin mirrored touch stream.
-                        PointerAccessibilityService.instance?.mirrorTouchDown(x, y)
+                        PointerAccessibilityService.instance?.touchHoldDown(x, y)
                         if (mirrorRenderClick) {
                             PointerService.instance?.updateMirrorTouch(x, y, true)
                         }
@@ -135,7 +135,7 @@ class MirrorActivity : Activity() {
                             }
                         }
                         // Continue mirrored touch stream.
-                        PointerAccessibilityService.instance?.mirrorTouchMove(x, y)
+                        PointerAccessibilityService.instance?.touchHoldMove(x, y)
                         if (mirrorRenderClick) {
                             PointerService.instance?.updateMirrorTouch(x, y, true)
                         }
@@ -145,7 +145,7 @@ class MirrorActivity : Activity() {
                         if (lockEdgeX) x = lockedX
                         if (lockEdgeY) y = lockedY
                         // End mirrored touch stream.
-                        PointerAccessibilityService.instance?.mirrorTouchUp(x, y)
+                        PointerAccessibilityService.instance?.touchHoldUp(x, y)
                         if (mirrorRenderClick) {
                             PointerService.instance?.updateMirrorTouch(x, y, false)
                             val durationMs = event.eventTime - mirrorDownTimeMs
@@ -162,7 +162,7 @@ class MirrorActivity : Activity() {
                     }
                     MotionEvent.ACTION_CANCEL -> {
                         // Cancel mirrored touch stream.
-                        PointerAccessibilityService.instance?.mirrorTouchCancel()
+                        PointerAccessibilityService.instance?.touchHoldCancel()
                         if (mirrorRenderClick) {
                             PointerService.instance?.updateMirrorTouch(x, y, false)
                         }
@@ -288,7 +288,7 @@ class MirrorActivity : Activity() {
     // onDestroy.
     override fun onDestroy() {
         super.onDestroy()
-        PointerAccessibilityService.instance?.mirrorTouchCancel()
+        PointerAccessibilityService.instance?.touchHoldCancel()
         PointerService.instance?.detachMirrorSurface()
         stopMirrorService()
     }
@@ -561,3 +561,4 @@ class MirrorActivity : Activity() {
         return prefs.getInt(MirrorConstants.Prefs.BUTTON_SIZE, defaultPx).coerceIn(minPx, maxPx)
     }
 }
+
