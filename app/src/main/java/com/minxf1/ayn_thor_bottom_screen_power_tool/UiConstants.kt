@@ -96,6 +96,16 @@ object UiConstants {
         const val TRACKPAD_CLICK_DISTANCE_MIN_PX = 5
         const val TRACKPAD_CLICK_DISTANCE_MAX_PX = 80
         const val TRACKPAD_CLICK_DISTANCE_DEFAULT_PX = 20
+
+        const val CURSOR_OPACITY_MIN = 0
+        const val CURSOR_OPACITY_MAX = 100
+        const val CURSOR_OPACITY_DEFAULT = 100
+
+        const val CURSOR_COLOR_MIN = 0
+        const val CURSOR_COLOR_MAX = 255
+        const val CURSOR_COLOR_R_DEFAULT = 0
+        const val CURSOR_COLOR_G_DEFAULT = 200
+        const val CURSOR_COLOR_B_DEFAULT = 83
     }
 
     // Backup file format version for settings export/import.

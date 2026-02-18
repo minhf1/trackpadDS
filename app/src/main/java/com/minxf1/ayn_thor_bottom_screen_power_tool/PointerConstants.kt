@@ -27,7 +27,7 @@ object PointerConstants {
     }
 
     object Alpha {
-        const val CURSOR = 0.5f
+        const val CURSOR = 1f
         const val MIRROR_TOUCH = 0.8f
     }
 

@@ -43,6 +43,13 @@ internal class CursorDotView @JvmOverloads constructor(
         invalidate()
     }
 
+    fun setColors(dotColor: Int, indicatorColor: Int) {
+        if (dotPaint.color == dotColor && indicatorPaint.color == indicatorColor) return
+        dotPaint.color = dotColor
+        indicatorPaint.color = indicatorColor
+        invalidate()
+    }
+
     // Draws the center dot and directional indicators.
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)

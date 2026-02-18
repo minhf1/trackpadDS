@@ -59,6 +59,7 @@ class PointerService : Service() {
     private var ghostCursorView: View? = null
     private var ghostCursorLp: WindowManager.LayoutParams? = null
     private var cursorSizePx = 0
+    private var cursorBaseAlpha = PointerConstants.Alpha.CURSOR
     private var lastCursorX = 0
     private var lastCursorY = 0
     private var lastCursorMoveMs = 0L
@@ -234,9 +235,7 @@ class PointerService : Service() {
         ).toInt()
         cursorSizePx = sizePx
 
-        ghostCursorView = CursorDotView(displayCtx, sizePx).apply {
-            alpha = PointerConstants.Alpha.CURSOR * 0.35f
-        }
+        ghostCursorView = CursorDotView(displayCtx, sizePx)
         ghostCursorLp = WindowManager.LayoutParams(
             sizePx,
             sizePx,
@@ -250,7 +249,7 @@ class PointerService : Service() {
             gravity = Gravity.TOP or Gravity.START
         }
         cursorView = CursorDotView(displayCtx, sizePx)
-        cursorView?.alpha = PointerConstants.Alpha.CURSOR
+        updateCursorAppearance()
         cursorLp = WindowManager.LayoutParams(
             sizePx,
             sizePx,
@@ -298,7 +297,7 @@ class PointerService : Service() {
                         lastCursorMoveMs = now
                         if (cursorFadedOut) {
                             cursorView?.animate()
-                                ?.alpha(PointerConstants.Alpha.CURSOR)
+                                ?.alpha(cursorBaseAlpha)
                                 ?.setDuration(PointerConstants.Timing.CURSOR_FADE_IN_MS)
                                 ?.start()
                             cursorFadedOut = false
@@ -307,7 +306,7 @@ class PointerService : Service() {
                         lastCursorMoveMs = now
                         if (cursorFadedOut) {
                             cursorView?.animate()
-                                ?.alpha(PointerConstants.Alpha.CURSOR)
+                                ?.alpha(cursorBaseAlpha)
                                 ?.setDuration(PointerConstants.Timing.CURSOR_FADE_IN_MS)
                                 ?.start()
                             cursorFadedOut = false
@@ -390,6 +389,7 @@ class PointerService : Service() {
         cursorLp = null
         ghostCursorLp = null
         cursorSizePx = 0
+        cursorBaseAlpha = PointerConstants.Alpha.CURSOR
         detachLightPrimaryButton()
     }
 
@@ -1104,6 +1104,8 @@ class PointerService : Service() {
 
         Log.d("PointerService", "buttonOpacity $buttonOpacity")
 
+        updateCursorAppearance()
+
         dragModeEnabled = uiPrefs.getBoolean("drag_mode_enabled", false)
         dragEnabled = dragModeEnabled
         updateFloatingButtonState(
@@ -1322,6 +1324,53 @@ class PointerService : Service() {
         updateTrackpadHeaderVisibility(!navButtonsEnabled)
         updateTrackpadVisibility(padViewA, padLpA, showPadRight, wm)
         updateTrackpadVisibility(padViewB, padLpB, showPadLeft, wm)
+    }
+
+    private fun updateCursorAppearance() {
+        val baseColor = readCursorColor()
+        val indicatorColor = scaleColor(baseColor, 0.85f)
+        val opacityPct = uiPrefs.getInt(
+            "cursor_opacity",
+            UiConstants.Sliders.CURSOR_OPACITY_DEFAULT
+        ).coerceIn(UiConstants.Sliders.CURSOR_OPACITY_MIN, UiConstants.Sliders.CURSOR_OPACITY_MAX)
+        cursorBaseAlpha = PointerConstants.Alpha.CURSOR * (opacityPct / 100f)
+        (cursorView as? CursorDotView)?.setColors(baseColor, indicatorColor)
+        cursorView?.alpha = cursorBaseAlpha
+        val ghostBase = toGray(baseColor)
+        val ghostIndicator = scaleColor(ghostBase, 0.85f)
+        (ghostCursorView as? CursorDotView)?.setColors(ghostBase, ghostIndicator)
+        ghostCursorView?.alpha = cursorBaseAlpha
+    }
+
+    private fun readCursorColor(): Int {
+        val r = uiPrefs.getInt(
+            "cursor_color_r",
+            UiConstants.Sliders.CURSOR_COLOR_R_DEFAULT
+        ).coerceIn(UiConstants.Sliders.CURSOR_COLOR_MIN, UiConstants.Sliders.CURSOR_COLOR_MAX)
+        val g = uiPrefs.getInt(
+            "cursor_color_g",
+            UiConstants.Sliders.CURSOR_COLOR_G_DEFAULT
+        ).coerceIn(UiConstants.Sliders.CURSOR_COLOR_MIN, UiConstants.Sliders.CURSOR_COLOR_MAX)
+        val b = uiPrefs.getInt(
+            "cursor_color_b",
+            UiConstants.Sliders.CURSOR_COLOR_B_DEFAULT
+        ).coerceIn(UiConstants.Sliders.CURSOR_COLOR_MIN, UiConstants.Sliders.CURSOR_COLOR_MAX)
+        return Color.rgb(r, g, b)
+    }
+
+    private fun scaleColor(color: Int, factor: Float): Int {
+        val r = (Color.red(color) * factor).toInt().coerceIn(0, 255)
+        val g = (Color.green(color) * factor).toInt().coerceIn(0, 255)
+        val b = (Color.blue(color) * factor).toInt().coerceIn(0, 255)
+        return Color.rgb(r, g, b)
+    }
+
+    private fun toGray(color: Int): Int {
+        val r = Color.red(color)
+        val g = Color.green(color)
+        val b = Color.blue(color)
+        val gray = (r * 0.299f + g * 0.587f + b * 0.114f).toInt().coerceIn(0, 255)
+        return Color.rgb(gray, gray, gray)
     }
 
     // updateTrackpadHeaderVisibility.
