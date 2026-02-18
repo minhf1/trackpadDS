@@ -1,6 +1,7 @@
 package com.minxf1.ayn_thor_bottom_screen_power_tool
 
 import android.content.Context
+import android.util.Log
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
@@ -10,6 +11,7 @@ import com.minxf1.ayn_thor_bottom_screen_power_tool.UiConstants.Sliders.SCROLL_S
 import kotlin.math.abs
 
 class TrackpadView(ctx: Context) : View(ctx) {
+    private val logTag = "TrackpadView"
     private val uiPrefs = ctx.getSharedPreferences("ui_config", Context.MODE_PRIVATE)
     private var primaryLastX = 0f
     private var primaryLastY = 0f
@@ -27,6 +29,9 @@ class TrackpadView(ctx: Context) : View(ctx) {
     private var isSecondaryHoldActive = false
     private var holdX = 0f
     private var holdY = 0f
+    private var scrollReturnX = 0f
+    private var scrollReturnY = 0f
+    private var hasScrollReturn = false
 
     private fun isTapClick(
         upTime: Long,
@@ -65,6 +70,9 @@ class TrackpadView(ctx: Context) : View(ctx) {
         isSecondaryHoldActive = false
         holdX = 0f
         holdY = 0f
+        scrollReturnX = 0f
+        scrollReturnY = 0f
+        hasScrollReturn = false
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
@@ -87,6 +95,10 @@ class TrackpadView(ctx: Context) : View(ctx) {
                 downY = e.y
                 primaryPointerId = e.getPointerId(0)
                 secondaryPointerId = null
+                Log.d(
+                    logTag,
+                    "DOWN pc=${e.pointerCount} pid0=$primaryPointerId x=${e.x} y=${e.y}"
+                )
                 return true
             }
 
@@ -102,8 +114,16 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     val s = PointerBus.get()
                     holdX = s.x
                     holdY = s.y
+                    scrollReturnX = s.x
+                    scrollReturnY = s.y
+                    hasScrollReturn = true
                     PointerAccessibilityService.instance?.touchHoldDown(s.x, s.y)
                     isSecondaryHoldActive = true
+                    Log.d(
+                        logTag,
+                        "POINTER_DOWN pc=${e.pointerCount} actionIdx=${e.actionIndex} " +
+                            "pid=$pointerId sx=$secondaryDownX sy=$secondaryDownY hold=($holdX,$holdY)"
+                    )
                 }
                 return true
             }
@@ -116,6 +136,12 @@ class TrackpadView(ctx: Context) : View(ctx) {
                 } ?: return true
                 val controlIndex = e.findPointerIndex(controlId)
                 if (controlIndex < 0) {
+                    Log.d(
+                        logTag,
+                        "MOVE no index controlId=$controlId pc=${e.pointerCount} " +
+                            "primaryId=$primaryPointerId secondaryId=$secondaryPointerId " +
+                            "secHold=$isSecondaryHoldActive"
+                    )
                     return true
                 }
                 val sensitivity = if (isSecondaryHoldActive) {
@@ -142,14 +168,13 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     primaryLastY = y
                 }
                 val (dx, dy) = RotationUtil.mapDeltaForRotation(4, dxRaw, dyRaw)
-
+                PointerBus.moveBy(dx, dy)
                 val secondaryId = secondaryPointerId
                 if (secondaryId != null) {
                     holdX += dx
                     holdY += dy
-                    PointerAccessibilityService.instance?.touchHoldMove(holdX, holdY)
-                } else {
-                    PointerBus.moveBy(dx, dy)
+                    val s = PointerBus.get()
+                    PointerAccessibilityService.instance?.touchHoldMove(s.x, s.y)
                 }
                 return true
             }
@@ -162,6 +187,10 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     }
                     PointerAccessibilityService.instance?.clickAt(s.x, s.y)
                 }
+                Log.d(
+                    logTag,
+                    "UP pc=${e.pointerCount} primaryId=$primaryPointerId secondaryId=$secondaryPointerId"
+                )
                 resetState()
                 return true
             }
@@ -169,9 +198,18 @@ class TrackpadView(ctx: Context) : View(ctx) {
             MotionEvent.ACTION_POINTER_UP -> {
                 val pointerId = e.getPointerId(e.actionIndex)
                 if (pointerId == secondaryPointerId) {
-                    PointerAccessibilityService.instance?.touchHoldUp(holdX, holdY)
+                    val s = PointerBus.get()
+                    PointerAccessibilityService.instance?.touchHoldUp(s.x, s.y)
+                    if (hasScrollReturn) {
+                        PointerBus.set(scrollReturnX, scrollReturnY)
+                    }
                     secondaryPointerId = null
                     isSecondaryHoldActive = false
+                    hasScrollReturn = false
+                    Log.d(
+                        logTag,
+                        "POINTER_UP secondary pid=$pointerId pc=${e.pointerCount} hold=($holdX,$holdY)"
+                    )
                 } else if (pointerId == primaryPointerId) {
                     primaryPointerId = secondaryPointerId
                     if (primaryPointerId != null) {
@@ -186,6 +224,10 @@ class TrackpadView(ctx: Context) : View(ctx) {
                         primaryLastY = secondaryLastY
                     }
                     secondaryPointerId = null
+                    Log.d(
+                        logTag,
+                        "POINTER_UP primary pid=$pointerId pc=${e.pointerCount} newPrimary=$primaryPointerId"
+                    )
                 }
                 return true
             }
