@@ -602,6 +602,42 @@ class MainActivity : ComponentActivity() {
             maxValue = UiConstants.Sliders.CURSOR_COLOR_MAX,
             defaultValue = UiConstants.Sliders.CURSOR_COLOR_B_DEFAULT
         ))
+        trackpadOptions.addView(buildIntSliderRow(
+            label = "Cursor edge thickness (dp)",
+            key = "cursor_edge_dp",
+            prefs = prefs,
+            icon = android.R.drawable.ic_menu_crop,
+            minValue = UiConstants.Sliders.CURSOR_EDGE_MIN_DP,
+            maxValue = UiConstants.Sliders.CURSOR_EDGE_MAX_DP,
+            defaultValue = UiConstants.Sliders.CURSOR_EDGE_DEFAULT_DP
+        ))
+        trackpadOptions.addView(buildIntSliderRow(
+            label = "Cursor edge color - Red",
+            key = "cursor_edge_color_r",
+            prefs = prefs,
+            icon = android.R.drawable.ic_menu_edit,
+            minValue = UiConstants.Sliders.CURSOR_EDGE_COLOR_MIN,
+            maxValue = UiConstants.Sliders.CURSOR_EDGE_COLOR_MAX,
+            defaultValue = UiConstants.Sliders.CURSOR_EDGE_COLOR_R_DEFAULT
+        ))
+        trackpadOptions.addView(buildIntSliderRow(
+            label = "Cursor edge color - Green",
+            key = "cursor_edge_color_g",
+            prefs = prefs,
+            icon = android.R.drawable.ic_menu_edit,
+            minValue = UiConstants.Sliders.CURSOR_EDGE_COLOR_MIN,
+            maxValue = UiConstants.Sliders.CURSOR_EDGE_COLOR_MAX,
+            defaultValue = UiConstants.Sliders.CURSOR_EDGE_COLOR_G_DEFAULT
+        ))
+        trackpadOptions.addView(buildIntSliderRow(
+            label = "Cursor edge color - Blue",
+            key = "cursor_edge_color_b",
+            prefs = prefs,
+            icon = android.R.drawable.ic_menu_edit,
+            minValue = UiConstants.Sliders.CURSOR_EDGE_COLOR_MIN,
+            maxValue = UiConstants.Sliders.CURSOR_EDGE_COLOR_MAX,
+            defaultValue = UiConstants.Sliders.CURSOR_EDGE_COLOR_B_DEFAULT
+        ))
 
         val trackpadModeHeader = buildSubgroupHeaderRow(
             title = "Trackpad mode",

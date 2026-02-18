@@ -22,9 +22,15 @@ internal class CursorDotView @JvmOverloads constructor(
         color = UiConstants.Colors.CURSOR_INDICATOR
         style = Paint.Style.FILL
     }
+    private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = UiConstants.Colors.BLACK
+        style = Paint.Style.STROKE
+        strokeWidth = 0f
+    }
     private var dirX = 0
     private var dirY = 0
     private var dotRadius = 0f
+    private var edgeWidthPx = 0f
     private val leftPath = Path()
     private val rightPath = Path()
     private val upPath = Path()
@@ -50,6 +56,14 @@ internal class CursorDotView @JvmOverloads constructor(
         invalidate()
     }
 
+    fun setEdge(widthPx: Float, color: Int) {
+        if (edgeWidthPx == widthPx && edgePaint.color == color) return
+        edgeWidthPx = widthPx
+        edgePaint.color = color
+        edgePaint.strokeWidth = widthPx
+        invalidate()
+    }
+
     // Draws the center dot and directional indicators.
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -57,6 +71,10 @@ internal class CursorDotView @JvmOverloads constructor(
         val cy = height / 2f
 
         canvas.drawCircle(cx, cy, dotRadius, dotPaint)
+        if (edgeWidthPx > 0f) {
+            val r = (dotRadius - edgeWidthPx / 2f).coerceAtLeast(0f)
+            canvas.drawCircle(cx, cy, r, edgePaint)
+        }
 
         if (dirX < 0) {
             canvas.drawPath(leftPath, indicatorPaint)

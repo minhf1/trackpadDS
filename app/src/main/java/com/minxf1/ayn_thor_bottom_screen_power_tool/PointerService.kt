@@ -1329,16 +1329,29 @@ class PointerService : Service() {
     private fun updateCursorAppearance() {
         val baseColor = readCursorColor()
         val indicatorColor = scaleColor(baseColor, 0.85f)
+        val edgeColor = readCursorEdgeColor()
         val opacityPct = uiPrefs.getInt(
             "cursor_opacity",
             UiConstants.Sliders.CURSOR_OPACITY_DEFAULT
         ).coerceIn(UiConstants.Sliders.CURSOR_OPACITY_MIN, UiConstants.Sliders.CURSOR_OPACITY_MAX)
+        val edgeDp = uiPrefs.getInt(
+            "cursor_edge_dp",
+            UiConstants.Sliders.CURSOR_EDGE_DEFAULT_DP
+        ).coerceIn(UiConstants.Sliders.CURSOR_EDGE_MIN_DP, UiConstants.Sliders.CURSOR_EDGE_MAX_DP)
+        val edgePx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            edgeDp.toFloat(),
+            resources.displayMetrics
+        )
         cursorBaseAlpha = PointerConstants.Alpha.CURSOR * (opacityPct / 100f)
         (cursorView as? CursorDotView)?.setColors(baseColor, indicatorColor)
+        (cursorView as? CursorDotView)?.setEdge(edgePx, edgeColor)
         cursorView?.alpha = cursorBaseAlpha
         val ghostBase = toGray(baseColor)
         val ghostIndicator = scaleColor(ghostBase, 0.85f)
+        val ghostEdge = toGray(edgeColor)
         (ghostCursorView as? CursorDotView)?.setColors(ghostBase, ghostIndicator)
+        (ghostCursorView as? CursorDotView)?.setEdge(edgePx, ghostEdge)
         ghostCursorView?.alpha = cursorBaseAlpha
     }
 
@@ -1355,6 +1368,22 @@ class PointerService : Service() {
             "cursor_color_b",
             UiConstants.Sliders.CURSOR_COLOR_B_DEFAULT
         ).coerceIn(UiConstants.Sliders.CURSOR_COLOR_MIN, UiConstants.Sliders.CURSOR_COLOR_MAX)
+        return Color.rgb(r, g, b)
+    }
+
+    private fun readCursorEdgeColor(): Int {
+        val r = uiPrefs.getInt(
+            "cursor_edge_color_r",
+            UiConstants.Sliders.CURSOR_EDGE_COLOR_R_DEFAULT
+        ).coerceIn(UiConstants.Sliders.CURSOR_EDGE_COLOR_MIN, UiConstants.Sliders.CURSOR_EDGE_COLOR_MAX)
+        val g = uiPrefs.getInt(
+            "cursor_edge_color_g",
+            UiConstants.Sliders.CURSOR_EDGE_COLOR_G_DEFAULT
+        ).coerceIn(UiConstants.Sliders.CURSOR_EDGE_COLOR_MIN, UiConstants.Sliders.CURSOR_EDGE_COLOR_MAX)
+        val b = uiPrefs.getInt(
+            "cursor_edge_color_b",
+            UiConstants.Sliders.CURSOR_EDGE_COLOR_B_DEFAULT
+        ).coerceIn(UiConstants.Sliders.CURSOR_EDGE_COLOR_MIN, UiConstants.Sliders.CURSOR_EDGE_COLOR_MAX)
         return Color.rgb(r, g, b)
     }
 

@@ -106,6 +106,16 @@ object UiConstants {
         const val CURSOR_COLOR_R_DEFAULT = 0
         const val CURSOR_COLOR_G_DEFAULT = 200
         const val CURSOR_COLOR_B_DEFAULT = 83
+
+        const val CURSOR_EDGE_MIN_DP = 0
+        const val CURSOR_EDGE_MAX_DP = 6
+        const val CURSOR_EDGE_DEFAULT_DP = 0
+
+        const val CURSOR_EDGE_COLOR_MIN = 0
+        const val CURSOR_EDGE_COLOR_MAX = 255
+        const val CURSOR_EDGE_COLOR_R_DEFAULT = 0
+        const val CURSOR_EDGE_COLOR_G_DEFAULT = 0
+        const val CURSOR_EDGE_COLOR_B_DEFAULT = 0
     }
 
     // Backup file format version for settings export/import.
