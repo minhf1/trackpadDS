@@ -25,6 +25,8 @@ class TrackpadView(ctx: Context) : View(ctx) {
     private var secondaryDownX = 0f
     private var secondaryDownY = 0f
     private var isSecondaryHoldActive = false
+    private var holdX = 0f
+    private var holdY = 0f
 
     private fun isTapClick(
         upTime: Long,
@@ -61,6 +63,8 @@ class TrackpadView(ctx: Context) : View(ctx) {
         secondaryDownX = 0f
         secondaryDownY = 0f
         isSecondaryHoldActive = false
+        holdX = 0f
+        holdY = 0f
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
@@ -96,6 +100,8 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     secondaryLastX = secondaryDownX
                     secondaryLastY = secondaryDownY
                     val s = PointerBus.get()
+                    holdX = s.x
+                    holdY = s.y
                     PointerAccessibilityService.instance?.touchHoldDown(s.x, s.y)
                     isSecondaryHoldActive = true
                 }
@@ -137,11 +143,13 @@ class TrackpadView(ctx: Context) : View(ctx) {
                 }
                 val (dx, dy) = RotationUtil.mapDeltaForRotation(4, dxRaw, dyRaw)
 
-                PointerBus.moveBy(dx, dy)
                 val secondaryId = secondaryPointerId
                 if (secondaryId != null) {
-                    val s = PointerBus.get()
-                    PointerAccessibilityService.instance?.touchHoldMove(s.x, s.y)
+                    holdX += dx
+                    holdY += dy
+                    PointerAccessibilityService.instance?.touchHoldMove(holdX, holdY)
+                } else {
+                    PointerBus.moveBy(dx, dy)
                 }
                 return true
             }
@@ -161,8 +169,7 @@ class TrackpadView(ctx: Context) : View(ctx) {
             MotionEvent.ACTION_POINTER_UP -> {
                 val pointerId = e.getPointerId(e.actionIndex)
                 if (pointerId == secondaryPointerId) {
-                    val s = PointerBus.get()
-                    PointerAccessibilityService.instance?.touchHoldUp(s.x, s.y)
+                    PointerAccessibilityService.instance?.touchHoldUp(holdX, holdY)
                     secondaryPointerId = null
                     isSecondaryHoldActive = false
                 } else if (pointerId == primaryPointerId) {
