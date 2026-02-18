@@ -56,6 +56,8 @@ class PointerService : Service() {
     private var cursorLp: WindowManager.LayoutParams? = null
     private var cursorTimer: Timer? = null
     private var cursorView: View? = null
+    private var ghostCursorView: View? = null
+    private var ghostCursorLp: WindowManager.LayoutParams? = null
     private var cursorSizePx = 0
     private var lastCursorX = 0
     private var lastCursorY = 0
@@ -232,6 +234,21 @@ class PointerService : Service() {
         ).toInt()
         cursorSizePx = sizePx
 
+        ghostCursorView = CursorDotView(displayCtx, sizePx).apply {
+            alpha = PointerConstants.Alpha.CURSOR * 0.35f
+        }
+        ghostCursorLp = WindowManager.LayoutParams(
+            sizePx,
+            sizePx,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+        }
         cursorView = CursorDotView(displayCtx, sizePx)
         cursorView?.alpha = PointerConstants.Alpha.CURSOR
         cursorLp = WindowManager.LayoutParams(
@@ -311,6 +328,28 @@ class PointerService : Service() {
                         if (showIndicator) indicator.dirX else 0,
                         if (showIndicator) indicator.dirY else 0
                     )
+                    val ghost = PointerBus.getGhostCursor()
+                    if (ghost.active) {
+                        val half = cursorSizePx / 2f
+                        val gLp = ghostCursorLp
+                        if (gLp != null) {
+                            gLp.x = (ghost.x - half).toInt()
+                            gLp.y = (ghost.y - half).toInt()
+                        }
+                        ghostCursorView?.let { gView ->
+                            if (gLp != null) {
+                                if (gView.parent == null) {
+                                    safeAddView(cursorWm, gView, gLp)
+                                } else {
+                                    safeUpdateViewLayout(cursorWm, gView, gLp)
+                                }
+                            }
+                        }
+                    } else {
+                        if (ghostCursorView?.parent != null) {
+                            safeRemoveView(cursorWm, ghostCursorView)
+                        }
+                    }
                     safeUpdateViewLayout(cursorWm, cursorView, lp)
                 }
             } catch (_: Throwable) {}
@@ -323,6 +362,7 @@ class PointerService : Service() {
         cursorTimer = null
 
         val tmpV = cursorView
+        val tmpGhostCursor = ghostCursorView
         val tmpWm = cursorWm
 
         if (tmpV != null && tmpWm != null) {
@@ -336,10 +376,19 @@ class PointerService : Service() {
                 Log.e("PointerService", "Failed to remove cursor overlay", t)
             }
         }
-
+        if (tmpGhostCursor != null && tmpWm != null) {
+            try {
+                if (tmpGhostCursor.parent != null) {
+                    safeRemoveViewImmediate(tmpWm, tmpGhostCursor)
+                }
+            } catch (_: Throwable) {
+            }
+        }
         cursorView = null
+        ghostCursorView = null
         cursorWm = null
         cursorLp = null
+        ghostCursorLp = null
         cursorSizePx = 0
         detachLightPrimaryButton()
     }

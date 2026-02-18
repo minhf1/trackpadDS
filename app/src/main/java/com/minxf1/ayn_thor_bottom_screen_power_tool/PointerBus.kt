@@ -5,10 +5,12 @@ import java.util.concurrent.atomic.AtomicReference
 
 data class CursorState(val x: Float, val y: Float, val displayW: Int, val displayH: Int)
 data class ScrollIndicator(val dirX: Int, val dirY: Int, val atMs: Long)
+data class GhostCursorState(val x: Float, val y: Float, val active: Boolean)
 
 object PointerBus {
     private val stateRef = AtomicReference(CursorState(200f, 200f, 1080, 1920))
     private val scrollRef = AtomicReference(ScrollIndicator(0, 0, 0L))
+    private val ghostRef = AtomicReference(GhostCursorState(0f, 0f, false))
 
     fun get(): CursorState = stateRef.get()
 
@@ -45,4 +47,14 @@ object PointerBus {
     }
 
     fun getScrollIndicator(): ScrollIndicator = scrollRef.get()
+
+    fun setGhostCursor(x: Float, y: Float) {
+        ghostRef.set(GhostCursorState(x, y, true))
+    }
+
+    fun clearGhostCursor() {
+        ghostRef.set(GhostCursorState(0f, 0f, false))
+    }
+
+    fun getGhostCursor(): GhostCursorState = ghostRef.get()
 }

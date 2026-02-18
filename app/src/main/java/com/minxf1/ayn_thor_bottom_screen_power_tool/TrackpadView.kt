@@ -73,6 +73,7 @@ class TrackpadView(ctx: Context) : View(ctx) {
         scrollReturnX = 0f
         scrollReturnY = 0f
         hasScrollReturn = false
+        PointerBus.clearGhostCursor()
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
@@ -117,6 +118,7 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     scrollReturnX = s.x
                     scrollReturnY = s.y
                     hasScrollReturn = true
+                    PointerBus.setGhostCursor(scrollReturnX, scrollReturnY)
                     PointerAccessibilityService.instance?.touchHoldDown(s.x, s.y)
                     isSecondaryHoldActive = true
                     Log.d(
@@ -211,6 +213,7 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     if (hasScrollReturn) {
                         PointerBus.set(scrollReturnX, scrollReturnY)
                     }
+                    PointerBus.clearGhostCursor()
                     secondaryPointerId = null
                     isSecondaryHoldActive = false
                     hasScrollReturn = false
