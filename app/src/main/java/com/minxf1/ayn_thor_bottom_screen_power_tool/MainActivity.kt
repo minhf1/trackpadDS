@@ -81,7 +81,17 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(UiConstants.Colors.BLACK)
         }
 
-        root.addView(buildKofiBanner())
+        root.addView(buildBanner(
+            bannerText = "Buy me coffee if you love the app",
+            url = "https://ko-fi.com/minxf1",
+            imageRes = R.drawable.support_me_on_kofi_dark
+        ))
+        root.addView(space(UiConstants.Spacing.SMALL_GAP))
+        root.addView(buildBanner(
+            bannerText = "Questions or bug reports? Join our Discord community.",
+            url = "https://discord.gg/MzwXzC4K6s",
+            imageRes = R.drawable.discord_logo_link
+        ))
         root.addView(space(UiConstants.Spacing.SMALL_GAP))
 
         buildPermissionNotice()?.let { notice ->
@@ -373,8 +383,12 @@ class MainActivity : ComponentActivity() {
         return container
     }
 
-    // buildKofiBanner.
-    private fun buildKofiBanner(): LinearLayout {
+    // buildBanner.
+    private fun buildBanner(
+        bannerText: String,
+        url: String,
+        imageRes: Int
+    ): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(
@@ -386,13 +400,12 @@ class MainActivity : ComponentActivity() {
             setBackgroundColor(UiConstants.Colors.BANNER_BG)
             gravity = Gravity.CENTER_VERTICAL
             setOnClickListener {
-                val uri = Uri.parse("https://ko-fi.com/minxf1")
+                val uri = url.toUri()
                 startActivity(Intent(Intent.ACTION_VIEW, uri))
             }
 
-            // Banner text and image.
             val textView = TextView(context).apply {
-                text = "Buy me coffee if you love the app"
+                text = bannerText
                 textSize = UiConstants.Text.BANNER
                 setTextColor(UiConstants.Colors.TEXT_PRIMARY)
                 gravity = Gravity.CENTER_VERTICAL
@@ -407,7 +420,7 @@ class MainActivity : ComponentActivity() {
             addView(textView)
 
             val iconView = ImageView(context).apply {
-                setImageResource(R.drawable.support_me_on_kofi_dark)
+                setImageResource(imageRes)
                 adjustViewBounds = true
                 scaleType = ImageView.ScaleType.FIT_CENTER
                 layoutParams = LinearLayout.LayoutParams(
