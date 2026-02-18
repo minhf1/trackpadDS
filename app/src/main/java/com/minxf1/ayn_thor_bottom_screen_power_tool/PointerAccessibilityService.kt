@@ -23,7 +23,7 @@ class PointerAccessibilityService : AccessibilityService() {
     private var holdLastX = 0f
     private var holdLastY = 0f
     private var holdLastEventMs = 0L
-    private val holdDurationMs = 10_000L
+    private val holdDurationMs = 60_000L
     private val holdMinSegmentMs = 4L
     private val holdMaxSegmentMs = 12L
     private val holdDispatchIntervalMs = 6L

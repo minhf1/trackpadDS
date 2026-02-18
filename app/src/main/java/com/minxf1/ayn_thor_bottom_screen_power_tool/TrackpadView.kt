@@ -129,47 +129,55 @@ class TrackpadView(ctx: Context) : View(ctx) {
             }
 
             MotionEvent.ACTION_MOVE -> {
-                val controlId = if (isSecondaryHoldActive) {
-                    secondaryPointerId
-                } else {
-                    primaryPointerId
-                } ?: return true
-                val controlIndex = e.findPointerIndex(controlId)
-                if (controlIndex < 0) {
-                    Log.d(
-                        logTag,
-                        "MOVE no index controlId=$controlId pc=${e.pointerCount} " +
-                            "primaryId=$primaryPointerId secondaryId=$secondaryPointerId " +
-                            "secHold=$isSecondaryHoldActive"
-                    )
+                val cursorSensitivity = uiPrefs.getFloat("cursor_sensitivity", 4.5f)
+                    .coerceIn(0.5f, 6f)
+                var dxRawTotal = 0f
+                var dyRawTotal = 0f
+
+                val primaryId = primaryPointerId
+                if (primaryId != null) {
+                    val idx = e.findPointerIndex(primaryId)
+                    if (idx >= 0) {
+                        val x = e.getX(idx)
+                        val y = e.getY(idx)
+                        dxRawTotal += (x - primaryLastX) * cursorSensitivity
+                        dyRawTotal += (y - primaryLastY) * cursorSensitivity
+                        primaryLastX = x
+                        primaryLastY = y
+                    } else {
+                        Log.d(
+                            logTag,
+                            "MOVE no index primaryId=$primaryId pc=${e.pointerCount} " +
+                                "secondaryId=$secondaryPointerId secHold=$isSecondaryHoldActive"
+                        )
+                    }
+                }
+
+                val secondaryId = secondaryPointerId
+                if (secondaryId != null) {
+                    val idx = e.findPointerIndex(secondaryId)
+                    if (idx >= 0) {
+                        val x = e.getX(idx)
+                        val y = e.getY(idx)
+                        dxRawTotal += (x - secondaryLastX) * cursorSensitivity
+                        dyRawTotal += (y - secondaryLastY) * cursorSensitivity
+                        secondaryLastX = x
+                        secondaryLastY = y
+                    } else {
+                        Log.d(
+                            logTag,
+                            "MOVE no index secondaryId=$secondaryId pc=${e.pointerCount} " +
+                                "primaryId=$primaryPointerId secHold=$isSecondaryHoldActive"
+                        )
+                    }
+                }
+
+                if (dxRawTotal == 0f && dyRawTotal == 0f) {
                     return true
                 }
-                val sensitivity = if (isSecondaryHoldActive) {
-                    uiPrefs.getFloat("scroll_sensitivity", SCROLL_SENSITIVITY_DEFAULT).coerceIn(
-                        SCROLL_SENSITIVITY_MIN, SCROLL_SENSITIVITY_MAX
-                    )
-                } else {
-                    uiPrefs.getFloat("cursor_sensitivity", 4.5f).coerceIn(0.5f, 6f)
-                }
-                val x = e.getX(controlIndex)
-                val y = e.getY(controlIndex)
-                val (lastXRef, lastYRef) = if (isSecondaryHoldActive) {
-                    Pair(secondaryLastX, secondaryLastY)
-                } else {
-                    Pair(primaryLastX, primaryLastY)
-                }
-                val dxRaw = (x - lastXRef) * sensitivity
-                val dyRaw = (y - lastYRef) * sensitivity
-                if (isSecondaryHoldActive) {
-                    secondaryLastX = x
-                    secondaryLastY = y
-                } else {
-                    primaryLastX = x
-                    primaryLastY = y
-                }
-                val (dx, dy) = RotationUtil.mapDeltaForRotation(4, dxRaw, dyRaw)
+
+                val (dx, dy) = RotationUtil.mapDeltaForRotation(4, dxRawTotal, dyRawTotal)
                 PointerBus.moveBy(dx, dy)
-                val secondaryId = secondaryPointerId
                 if (secondaryId != null) {
                     holdX += dx
                     holdY += dy
