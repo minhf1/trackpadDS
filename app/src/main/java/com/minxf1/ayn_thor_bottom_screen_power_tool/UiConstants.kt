@@ -109,12 +109,12 @@ object UiConstants {
 
         const val CURSOR_EDGE_MIN_DP = 0
         const val CURSOR_EDGE_MAX_DP = 6
-        const val CURSOR_EDGE_DEFAULT_DP = 0
+        const val CURSOR_EDGE_DEFAULT_DP = 1
 
         const val CURSOR_EDGE_COLOR_MIN = 0
         const val CURSOR_EDGE_COLOR_MAX = 255
         const val CURSOR_EDGE_COLOR_R_DEFAULT = 0
-        const val CURSOR_EDGE_COLOR_G_DEFAULT = 0
+        const val CURSOR_EDGE_COLOR_G_DEFAULT = 123
         const val CURSOR_EDGE_COLOR_B_DEFAULT = 0
     }
 
