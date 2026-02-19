@@ -84,6 +84,8 @@ class TrackpadView(ctx: Context) : View(ctx) {
         }
 
         if (activePointerCount !in 0..2) {
+            // We only support 1-2 fingers; reset to avoid stuck pointer ids.
+            resetState()
             return true
         }
 
@@ -131,6 +133,12 @@ class TrackpadView(ctx: Context) : View(ctx) {
             }
 
             MotionEvent.ACTION_MOVE -> {
+                if (primaryPointerId == null && e.pointerCount > 0) {
+                    // Recover if state was reset while a finger stayed down.
+                    primaryPointerId = e.getPointerId(0)
+                    primaryLastX = e.getX(0)
+                    primaryLastY = e.getY(0)
+                }
                 val cursorSensitivity = uiPrefs.getFloat("cursor_sensitivity", 4.5f)
                     .coerceIn(0.5f, 6f)
                 var dxRawTotal = 0f
@@ -152,6 +160,15 @@ class TrackpadView(ctx: Context) : View(ctx) {
                             "MOVE no index primaryId=$primaryId pc=${e.pointerCount} " +
                                 "secondaryId=$secondaryPointerId secHold=$isSecondaryHoldActive"
                         )
+                        // Attempt to recover by re-binding to any available pointer.
+                        if (e.pointerCount > 0) {
+                            primaryPointerId = e.getPointerId(0)
+                            primaryLastX = e.getX(0)
+                            primaryLastY = e.getY(0)
+                        } else {
+                            resetState()
+                            return true
+                        }
                     }
                 }
 
@@ -171,6 +188,14 @@ class TrackpadView(ctx: Context) : View(ctx) {
                             "MOVE no index secondaryId=$secondaryId pc=${e.pointerCount} " +
                                 "primaryId=$primaryPointerId secHold=$isSecondaryHoldActive"
                         )
+                        // Secondary pointer disappeared without a clean POINTER_UP.
+                        if (isSecondaryHoldActive) {
+                            PointerAccessibilityService.instance?.touchHoldCancel()
+                            PointerBus.clearGhostCursor()
+                            isSecondaryHoldActive = false
+                            hasScrollReturn = false
+                        }
+                        secondaryPointerId = null
                     }
                 }
 
