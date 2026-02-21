@@ -1,7 +1,6 @@
 package com.minxf1.ayn_thor_bottom_screen_power_tool
 
 import android.content.Context
-import android.util.Log
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
@@ -84,6 +83,8 @@ class TrackpadView(ctx: Context) : View(ctx) {
         }
 
         if (activePointerCount !in 0..2) {
+            // We only support 1-2 fingers; reset to avoid stuck pointer ids.
+            resetState()
             return true
         }
 
@@ -96,10 +97,6 @@ class TrackpadView(ctx: Context) : View(ctx) {
                 downY = e.y
                 primaryPointerId = e.getPointerId(0)
                 secondaryPointerId = null
-                Log.d(
-                    logTag,
-                    "DOWN pc=${e.pointerCount} pid0=$primaryPointerId x=${e.x} y=${e.y}"
-                )
                 return true
             }
 
@@ -121,16 +118,17 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     PointerBus.setGhostCursor(scrollReturnX, scrollReturnY)
                     PointerAccessibilityService.instance?.touchHoldDown(s.x, s.y)
                     isSecondaryHoldActive = true
-                    Log.d(
-                        logTag,
-                        "POINTER_DOWN pc=${e.pointerCount} actionIdx=${e.actionIndex} " +
-                            "pid=$pointerId sx=$secondaryDownX sy=$secondaryDownY hold=($holdX,$holdY)"
-                    )
                 }
                 return true
             }
 
             MotionEvent.ACTION_MOVE -> {
+                if (primaryPointerId == null && e.pointerCount > 0) {
+                    // Recover if state was reset while a finger stayed down.
+                    primaryPointerId = e.getPointerId(0)
+                    primaryLastX = e.getX(0)
+                    primaryLastY = e.getY(0)
+                }
                 val cursorSensitivity = uiPrefs.getFloat("cursor_sensitivity", 4.5f)
                     .coerceIn(0.5f, 6f)
                 var dxRawTotal = 0f
@@ -147,11 +145,15 @@ class TrackpadView(ctx: Context) : View(ctx) {
                         primaryLastX = x
                         primaryLastY = y
                     } else {
-                        Log.d(
-                            logTag,
-                            "MOVE no index primaryId=$primaryId pc=${e.pointerCount} " +
-                                "secondaryId=$secondaryPointerId secHold=$isSecondaryHoldActive"
-                        )
+                        // Attempt to recover by re-binding to any available pointer.
+                        if (e.pointerCount > 0) {
+                            primaryPointerId = e.getPointerId(0)
+                            primaryLastX = e.getX(0)
+                            primaryLastY = e.getY(0)
+                        } else {
+                            resetState()
+                            return true
+                        }
                     }
                 }
 
@@ -166,11 +168,14 @@ class TrackpadView(ctx: Context) : View(ctx) {
                         secondaryLastX = x
                         secondaryLastY = y
                     } else {
-                        Log.d(
-                            logTag,
-                            "MOVE no index secondaryId=$secondaryId pc=${e.pointerCount} " +
-                                "primaryId=$primaryPointerId secHold=$isSecondaryHoldActive"
-                        )
+                        // Secondary pointer disappeared without a clean POINTER_UP.
+                        if (isSecondaryHoldActive) {
+                            PointerAccessibilityService.instance?.touchHoldCancel()
+                            PointerBus.clearGhostCursor()
+                            isSecondaryHoldActive = false
+                            hasScrollReturn = false
+                        }
+                        secondaryPointerId = null
                     }
                 }
 
@@ -197,10 +202,6 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     }
                     PointerAccessibilityService.instance?.clickAt(s.x, s.y)
                 }
-                Log.d(
-                    logTag,
-                    "UP pc=${e.pointerCount} primaryId=$primaryPointerId secondaryId=$secondaryPointerId"
-                )
                 resetState()
                 return true
             }
@@ -217,10 +218,6 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     secondaryPointerId = null
                     isSecondaryHoldActive = false
                     hasScrollReturn = false
-                    Log.d(
-                        logTag,
-                        "POINTER_UP secondary pid=$pointerId pc=${e.pointerCount} hold=($holdX,$holdY)"
-                    )
                 } else if (pointerId == primaryPointerId) {
                     primaryPointerId = secondaryPointerId
                     if (primaryPointerId != null) {
@@ -235,10 +232,6 @@ class TrackpadView(ctx: Context) : View(ctx) {
                         primaryLastY = secondaryLastY
                     }
                     secondaryPointerId = null
-                    Log.d(
-                        logTag,
-                        "POINTER_UP primary pid=$pointerId pc=${e.pointerCount} newPrimary=$primaryPointerId"
-                    )
                 }
                 return true
             }
