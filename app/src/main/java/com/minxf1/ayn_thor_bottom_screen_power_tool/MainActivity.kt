@@ -244,22 +244,6 @@ class MainActivity : ComponentActivity() {
         updateOverlayButtonState()
         pendingStart = false
 
-        // Launch trackpad on secondary display if available; otherwise launch on primary
-//        val dm = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-//        val secondary = dm.displays.firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
-
-//        val intent = Intent(this, TrackpadActivity::class.java).apply {
-//            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-//        }
-
-//        if (secondary != null) {
-//            val opts = ActivityOptions.makeBasic().apply {
-//                launchDisplayId = secondary.displayId
-//            }
-//            startActivity(intent, opts.toBundle())
-//        } else {
-//            startActivity(intent)
-//        }
     }
 
     // ensureDefaultsFromAsset.
