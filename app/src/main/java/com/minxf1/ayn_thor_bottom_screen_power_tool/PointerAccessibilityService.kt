@@ -7,6 +7,7 @@ import android.app.ActivityOptions
 import android.content.ComponentName
 import android.content.Intent
 import android.os.SystemClock
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
 import kotlin.math.abs
@@ -23,15 +24,45 @@ class PointerAccessibilityService : AccessibilityService() {
     private var holdLastX = 0f
     private var holdLastY = 0f
     private var holdLastEventMs = 0L
+    private var holdStartMs = 0L
     private val holdDurationMs = 60_000L
-    private val holdMinSegmentMs = 4L
-    private val holdMaxSegmentMs = 12L
-    private val holdDispatchIntervalMs = 6L
+    private val holdMinSegmentMs = 8L
+    private val holdMaxSegmentMs = 20L
+    private val holdDispatchIntervalMs = 20L
+    private val holdStartDelayMs = 50L
     private var holdPendingX = 0f
     private var holdPendingY = 0f
     private var holdHasPending = false
 
     private val lastTopByDisplay = mutableMapOf<Int, ComponentName>()
+    private var gestureSeq = 0
+
+    private fun dispatchGestureLogged(tag: String, gesture: GestureDescription) {
+        val seq = ++gestureSeq
+        val ok = dispatchGesture(
+            gesture,
+            object : GestureResultCallback() {
+                override fun onCancelled(gestureDescription: GestureDescription?) {
+                    Log.w("PointerAS", "gesture cancelled tag=$tag seq=$seq")
+                    if (tag.startsWith("hold")) {
+                        onHoldGestureCancelled()
+                    }
+                }
+            },
+            null
+        )
+        if (!ok) {
+            Log.w("PointerAS", "gesture dispatch failed tag=$tag seq=$seq")
+            if (tag.startsWith("hold")) {
+                onHoldGestureCancelled()
+            }
+        }
+    }
+
+    private fun onHoldGestureCancelled() {
+        // Clear hold state to stop spamming holdMove/Up after a rejection.
+        touchHoldCancel()
+    }
 
     private fun clampToDisplay(x: Float, y: Float): Pair<Float, Float> {
         val s = PointerBus.get()
@@ -113,23 +144,25 @@ class PointerAccessibilityService : AccessibilityService() {
     }
 
     fun clickAt(x: Float, y: Float) {
+        if (holdStroke != null) return
         val path = Path().apply {
             moveTo(x, y)
             lineTo(x + 0.1f, y + 0.1f)
         }
         val stroke = GestureDescription.StrokeDescription(path, 0, 1)
         val gesture = GestureDescription.Builder().addStroke(stroke).build()
-        dispatchGesture(gesture, null, null)
+        dispatchGestureLogged("click", gesture)
     }
 
     fun rightClickAt(x: Float, y: Float) {
+        if (holdStroke != null) return
         val path = Path().apply {
             moveTo(x, y)
             lineTo(x + 0.1f, y + 0.1f)
         }
         val stroke = GestureDescription.StrokeDescription(path, 0, 450)
         val gesture = GestureDescription.Builder().addStroke(stroke).build()
-        dispatchGesture(gesture, null, null)
+        dispatchGestureLogged("rightClick", gesture)
     }
 
     fun touchHoldDown(x: Float, y: Float) {
@@ -150,8 +183,9 @@ class PointerAccessibilityService : AccessibilityService() {
         holdLastX = cx
         holdLastY = cy
         holdLastEventMs = now
+        holdStartMs = now
         holdHasPending = false
-        dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
+        dispatchGestureLogged("holdDown", GestureDescription.Builder().addStroke(stroke).build())
     }
 
     fun touchHoldMove(x: Float, y: Float) {
@@ -161,6 +195,12 @@ class PointerAccessibilityService : AccessibilityService() {
             return
         }
         val now = SystemClock.uptimeMillis()
+        if (now - holdStartMs < holdStartDelayMs) {
+            holdPendingX = cx
+            holdPendingY = cy
+            holdHasPending = true
+            return
+        }
         if (now - holdLastEventMs < holdDispatchIntervalMs) {
             holdPendingX = cx
             holdPendingY = cy
@@ -182,7 +222,7 @@ class PointerAccessibilityService : AccessibilityService() {
         holdLastX = endX
         holdLastY = endY
         holdLastEventMs = now
-        dispatchGesture(GestureDescription.Builder().addStroke(next).build(), null, null)
+        dispatchGestureLogged("holdMove", GestureDescription.Builder().addStroke(next).build())
     }
 
     fun touchHoldUp(x: Float, y: Float) {
@@ -202,17 +242,20 @@ class PointerAccessibilityService : AccessibilityService() {
         val next = current.continueStroke(path, 0, duration, false)
         holdStroke = null
         holdLastEventMs = 0L
+        holdStartMs = 0L
         holdHasPending = false
-        dispatchGesture(GestureDescription.Builder().addStroke(next).build(), null, null)
+        dispatchGestureLogged("holdUp", GestureDescription.Builder().addStroke(next).build())
     }
 
     fun touchHoldCancel() {
         holdStroke = null
         holdLastEventMs = 0L
+        holdStartMs = 0L
         holdHasPending = false
     }
 
     fun focusPrimaryBySwipe(displayW: Int, displayH: Int) {
+        if (holdStroke != null) return
         if (displayW <= 0 || displayH <= 0) return
         val startX = 6f
         val startY = (displayH - 8).toFloat().coerceIn(0f, (displayH - 1).toFloat())
@@ -223,7 +266,7 @@ class PointerAccessibilityService : AccessibilityService() {
         }
         val stroke = GestureDescription.StrokeDescription(path, 0, 40)
         val gesture = GestureDescription.Builder().addStroke(stroke).build()
-        dispatchGesture(gesture, null, null)
+        dispatchGestureLogged("focusSwipe", gesture)
     }
 
     /**
@@ -238,6 +281,7 @@ class PointerAccessibilityService : AccessibilityService() {
         displayW: Int,
         displayH: Int
     ) {
+        if (holdStroke != null) return
         val magnitudeX = (-deltaX).coerceIn(-800f, 800f)
         val magnitudeY = (-deltaY).coerceIn(-800f, 800f)
         if (abs(magnitudeX) < 4f && abs(magnitudeY) < 4f) return
@@ -275,7 +319,7 @@ class PointerAccessibilityService : AccessibilityService() {
         }
         val stroke = GestureDescription.StrokeDescription(path, 0, 120)
         val gesture = GestureDescription.Builder().addStroke(stroke).build()
-        dispatchGesture(gesture, null, null)
+        dispatchGestureLogged("scroll", gesture)
     }
 }
 
