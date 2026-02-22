@@ -325,6 +325,8 @@ class MainActivity : ComponentActivity() {
             ToggleSpec("show_stop_btn", "Stop overlay button", android.R.drawable.ic_menu_close_clear_cancel),
             ToggleSpec("show_hide_btn", "Show/Hide toggle button", R.drawable.ic_eye_open),
             ToggleSpec("show_swap_btn", "Screen swap button - Experimental use at your own risk to be fixed in future", R.drawable.ic_swap),
+            ToggleSpec("show_zoom_in_btn", "Zoom-in button", R.drawable.ic_zoom_in),
+            ToggleSpec("show_zoom_out_btn", "Zoom-out button", R.drawable.ic_zoom_out),
             ToggleSpec("show_light_btn", "Light overlay toggle button", R.drawable.ic_light_bulb),
             ToggleSpec("show_mirror_btn", "Mirror mode toggle button", R.drawable.ic_mirror),
             ToggleSpec("show_click_btn", "Click button", R.drawable.ic_trackpad_click),
@@ -727,6 +729,33 @@ class MainActivity : ComponentActivity() {
         }
         syncPrimaryEnabled.invoke()
 
+        val zoomHeader = buildSubgroupHeaderRow(
+            title = "Zoom",
+            subtitle = "Pinch gesture tuning for zoom buttons",
+            icon = R.drawable.ic_zoom_in,
+            flipIcon = false
+        )
+        val zoomOptions = buildOptionsContainer(paddingTopDp = UiConstants.Spacing.SUBGROUP_TOP)
+        toggleVisibilityOnClick(zoomHeader, zoomOptions)
+        zoomOptions.addView(buildIntSliderRow(
+            label = "Zoom gesture strength (%)",
+            key = "zoom_gesture_strength_pct",
+            prefs = prefs,
+            icon = R.drawable.ic_zoom_in,
+            minValue = 50,
+            maxValue = 200,
+            defaultValue = 100
+        ))
+        zoomOptions.addView(buildIntSliderRow(
+            label = "Zoom gesture duration (ms)",
+            key = "zoom_gesture_duration_ms",
+            prefs = prefs,
+            icon = R.drawable.ic_zoom_out,
+            minValue = 80,
+            maxValue = 600,
+            defaultValue = 220
+        ))
+
         val hapticHeader = buildSubgroupHeaderRow(
             title = "Trackpad haptic feedback",
             subtitle = "Trackpad and overlay vibration controls",
@@ -786,6 +815,9 @@ class MainActivity : ComponentActivity() {
         options.addView(space(UiConstants.Spacing.SMALL_GAP))
         options.addView(lightOffHeader)
         options.addView(lightOffOptions)
+        options.addView(space(UiConstants.Spacing.SMALL_GAP))
+        options.addView(zoomHeader)
+        options.addView(zoomOptions)
         options.addView(space(UiConstants.Spacing.SMALL_GAP))
         options.addView(hapticHeader)
         options.addView(hapticOptions)

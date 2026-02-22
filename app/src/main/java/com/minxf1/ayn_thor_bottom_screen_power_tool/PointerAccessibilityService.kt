@@ -6,6 +6,7 @@ import android.graphics.Path
 import android.app.ActivityOptions
 import android.content.ComponentName
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.SystemClock
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -21,6 +22,9 @@ class PointerAccessibilityService : AccessibilityService() {
     }
 
     private var holdStroke: GestureDescription.StrokeDescription? = null
+    private val uiPrefs: SharedPreferences by lazy {
+        getSharedPreferences("ui_config", MODE_PRIVATE)
+    }
     private var holdLastX = 0f
     private var holdLastY = 0f
     private var holdLastEventMs = 0L
@@ -320,6 +324,68 @@ class PointerAccessibilityService : AccessibilityService() {
         val stroke = GestureDescription.StrokeDescription(path, 0, 120)
         val gesture = GestureDescription.Builder().addStroke(stroke).build()
         dispatchGestureLogged("scroll", gesture)
+    }
+
+    fun zoomInAt(x: Float, y: Float, displayW: Int, displayH: Int) {
+        dispatchPinchGesture(x, y, displayW, displayH, zoomIn = true)
+    }
+
+    fun zoomOutAt(x: Float, y: Float, displayW: Int, displayH: Int) {
+        dispatchPinchGesture(x, y, displayW, displayH, zoomIn = false)
+    }
+
+    private fun dispatchPinchGesture(
+        x: Float,
+        y: Float,
+        displayW: Int,
+        displayH: Int,
+        zoomIn: Boolean
+    ) {
+        if (holdStroke != null) return
+        if (displayW <= 0 || displayH <= 0) return
+
+        val maxX = (displayW - 1).toFloat()
+        val maxY = (displayH - 1).toFloat()
+        val safeMargin = 28f
+        val cx = x.coerceIn(safeMargin, maxX - safeMargin)
+        val cy = y.coerceIn(safeMargin, maxY - safeMargin)
+
+        val minDim = minOf(displayW, displayH).toFloat()
+        val strength = uiPrefs
+            .getInt("zoom_gesture_strength_pct", 100)
+            .coerceIn(50, 200) / 100f
+        val durationMs = uiPrefs
+            .getInt("zoom_gesture_duration_ms", 220)
+            .coerceIn(80, 600)
+            .toLong()
+
+        val smallRadius = ((minDim * 0.05f) * strength).coerceIn(22f, 96f)
+        val largeRadius = ((minDim * 0.14f) * strength).coerceIn(60f, 240f)
+        val startRadius = if (zoomIn) smallRadius else largeRadius
+        val endRadius = if (zoomIn) largeRadius else smallRadius
+
+        val leftStartX = (cx - startRadius).coerceIn(0f, maxX)
+        val rightStartX = (cx + startRadius).coerceIn(0f, maxX)
+        val leftEndX = (cx - endRadius).coerceIn(0f, maxX)
+        val rightEndX = (cx + endRadius).coerceIn(0f, maxX)
+        if (leftStartX == leftEndX && rightStartX == rightEndX) return
+
+        val leftPath = Path().apply {
+            moveTo(leftStartX, cy)
+            lineTo(leftEndX, cy)
+        }
+        val rightPath = Path().apply {
+            moveTo(rightStartX, cy)
+            lineTo(rightEndX, cy)
+        }
+
+        val leftStroke = GestureDescription.StrokeDescription(leftPath, 0, durationMs)
+        val rightStroke = GestureDescription.StrokeDescription(rightPath, 0, durationMs)
+        val gesture = GestureDescription.Builder()
+            .addStroke(leftStroke)
+            .addStroke(rightStroke)
+            .build()
+        dispatchGestureLogged(if (zoomIn) "zoomIn" else "zoomOut", gesture)
     }
 }
 
