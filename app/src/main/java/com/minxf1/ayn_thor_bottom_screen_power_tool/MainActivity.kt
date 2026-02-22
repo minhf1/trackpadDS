@@ -325,6 +325,8 @@ class MainActivity : ComponentActivity() {
             ToggleSpec("show_stop_btn", "Stop overlay button", android.R.drawable.ic_menu_close_clear_cancel),
             ToggleSpec("show_hide_btn", "Show/Hide toggle button", R.drawable.ic_eye_open),
             ToggleSpec("show_swap_btn", "Screen swap button - Experimental use at your own risk to be fixed in future", R.drawable.ic_swap),
+            ToggleSpec("show_zoom_in_btn", "Zoom-in button", R.drawable.ic_zoom_in),
+            ToggleSpec("show_zoom_out_btn", "Zoom-out button", R.drawable.ic_zoom_out),
             ToggleSpec("show_light_btn", "Light overlay toggle button", R.drawable.ic_light_bulb),
             ToggleSpec("show_mirror_btn", "Mirror mode toggle button", R.drawable.ic_mirror),
             ToggleSpec("show_click_btn", "Click button", R.drawable.ic_trackpad_click),
@@ -727,6 +729,33 @@ class MainActivity : ComponentActivity() {
         }
         syncPrimaryEnabled.invoke()
 
+        val zoomHeader = buildSubgroupHeaderRow(
+            title = "Zoom",
+            subtitle = "Pinch gesture tuning for zoom buttons",
+            icon = R.drawable.ic_zoom_in,
+            flipIcon = false
+        )
+        val zoomOptions = buildOptionsContainer(paddingTopDp = UiConstants.Spacing.SUBGROUP_TOP)
+        toggleVisibilityOnClick(zoomHeader, zoomOptions)
+        zoomOptions.addView(buildIntSliderRow(
+            label = "Zoom gesture strength (%)",
+            key = "zoom_gesture_strength_pct",
+            prefs = prefs,
+            icon = R.drawable.ic_zoom_in,
+            minValue = 50,
+            maxValue = 200,
+            defaultValue = 100
+        ))
+        zoomOptions.addView(buildIntSliderRow(
+            label = "Zoom gesture duration (ms)",
+            key = "zoom_gesture_duration_ms",
+            prefs = prefs,
+            icon = R.drawable.ic_zoom_out,
+            minValue = 80,
+            maxValue = 600,
+            defaultValue = 220
+        ))
+
         val hapticHeader = buildSubgroupHeaderRow(
             title = "Trackpad haptic feedback",
             subtitle = "Trackpad and overlay vibration controls",
@@ -786,6 +815,9 @@ class MainActivity : ComponentActivity() {
         options.addView(space(UiConstants.Spacing.SMALL_GAP))
         options.addView(lightOffHeader)
         options.addView(lightOffOptions)
+        options.addView(space(UiConstants.Spacing.SMALL_GAP))
+        options.addView(zoomHeader)
+        options.addView(zoomOptions)
         options.addView(space(UiConstants.Spacing.SMALL_GAP))
         options.addView(hapticHeader)
         options.addView(hapticOptions)
@@ -1146,11 +1178,13 @@ class MainActivity : ComponentActivity() {
         val uiPrefs = getSharedPreferences("ui_config", MODE_PRIVATE)
         val posPrefs = getSharedPreferences("floating_positions", MODE_PRIVATE)
         val mirrorPrefs = getSharedPreferences("mirror_positions", MODE_PRIVATE)
+        val legacySizePrefs = getSharedPreferences("floating_sizes", MODE_PRIVATE)
         val root = JSONObject().apply {
             put("version", UiConstants.Backup.VERSION)
             put("ui_config", prefsToJson(uiPrefs))
             put("floating_positions", prefsToJson(posPrefs))
             put("mirror_positions", prefsToJson(mirrorPrefs))
+            put("floating_sizes", prefsToJson(legacySizePrefs))
         }
         try {
             contentResolver.openOutputStream(uri)?.use { stream ->
@@ -1172,6 +1206,7 @@ class MainActivity : ComponentActivity() {
             val uiPrefs = getSharedPreferences("ui_config", MODE_PRIVATE)
             val posPrefs = getSharedPreferences("floating_positions", MODE_PRIVATE)
             val mirrorPrefs = getSharedPreferences("mirror_positions", MODE_PRIVATE)
+            val legacySizePrefs = getSharedPreferences("floating_sizes", MODE_PRIVATE)
             if (root.has("ui_config")) {
                 applyJsonToPrefs(root.getJSONObject("ui_config"), uiPrefs)
             }
@@ -1180,6 +1215,9 @@ class MainActivity : ComponentActivity() {
             }
             if (root.has("mirror_positions")) {
                 applyJsonToPrefs(root.getJSONObject("mirror_positions"), mirrorPrefs)
+            }
+            if (root.has("floating_sizes")) {
+                applyJsonToPrefs(root.getJSONObject("floating_sizes"), legacySizePrefs)
             }
             Toast.makeText(this, "Settings imported", Toast.LENGTH_SHORT).show()
             updateOverlayButtonState()
@@ -1215,20 +1253,55 @@ class MainActivity : ComponentActivity() {
             val key = keys.next()
             when (val value = obj.get(key)) {
                 is Boolean -> editor.putBoolean(key, value)
-                is Int -> editor.putInt(key, value)
-                is Long -> editor.putLong(key, value)
-                is Double -> {
-                    val asInt = value.toInt()
-                    if (value == asInt.toDouble()) {
-                        editor.putInt(key, asInt)
-                    } else {
+                is Int -> {
+                    if (isFloatPreferenceKey(key)) {
                         editor.putFloat(key, value.toFloat())
+                    } else {
+                        editor.putInt(key, value)
+                    }
+                }
+                is Long -> {
+                    if (isFloatPreferenceKey(key)) {
+                        editor.putFloat(key, value.toFloat())
+                    } else {
+                        editor.putLong(key, value)
+                    }
+                }
+                is Double -> {
+                    if (isFloatPreferenceKey(key)) {
+                        editor.putFloat(key, value.toFloat())
+                    } else {
+                        val asInt = value.toInt()
+                        if (value == asInt.toDouble()) {
+                            editor.putInt(key, asInt)
+                        } else {
+                            editor.putFloat(key, value.toFloat())
+                        }
                     }
                 }
                 is String -> editor.putString(key, value)
             }
         }
         editor.apply()
+    }
+
+    private fun isFloatPreferenceKey(key: String): Boolean {
+        return key == "cursor_sensitivity" || key == "scroll_sensitivity"
+    }
+
+    private fun readFloatPreferenceCompat(
+        prefs: SharedPreferences,
+        key: String,
+        defaultValue: Float
+    ): Float {
+        return when (val raw = prefs.all[key]) {
+            is Float -> raw
+            is Int -> raw.toFloat()
+            is Long -> raw.toFloat()
+            is Double -> raw.toFloat()
+            is String -> raw.toFloatOrNull() ?: defaultValue
+            else -> defaultValue
+        }
     }
 
     // buildOptionsContainer.
@@ -1468,7 +1541,11 @@ class MainActivity : ComponentActivity() {
         val steps = UiConstants.Sliders.STEPS
         val slider = SeekBar(this).apply {
             max = steps
-            val stored = prefs.getFloat(key, defaultValue).coerceIn(minValue, maxValue)
+            val stored = readFloatPreferenceCompat(prefs, key, defaultValue)
+                .coerceIn(minValue, maxValue)
+            if (prefs.all[key] !is Float) {
+                prefs.edit().putFloat(key, stored).apply()
+            }
             val progressValue = ((stored - minValue) / (maxValue - minValue) * steps).roundToInt()
             progress = progressValue
             value.text = String.format("%.1f", stored)

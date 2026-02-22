@@ -65,6 +65,7 @@ class PointerService : Service() {
     private var lastCursorMoveMs = 0L
     private var cursorFadedOut = false
 
+    // COMPONENT_ADD_NOTE: Add view and Lp here for new components
     private var padWm: WindowManager? = null
     private var padViewA: View? = null
     private var padViewB: View? = null
@@ -78,6 +79,8 @@ class PointerService : Service() {
     private var navToggleView: ImageButton? = null
     private var hideToggleView: ImageButton? = null
     private var swapView: ImageButton? = null
+    private var zoomInView: ImageButton? = null
+    private var zoomOutView: ImageButton? = null
     private var lightToggleView: ImageButton? = null
     private var mirrorToggleView: ImageButton? = null
     private var clickView: ImageButton? = null
@@ -90,6 +93,8 @@ class PointerService : Service() {
     private var navToggleLp: WindowManager.LayoutParams? = null
     private var hideToggleLp: WindowManager.LayoutParams? = null
     private var swapLp: WindowManager.LayoutParams? = null
+    private var zoomInLp: WindowManager.LayoutParams? = null
+    private var zoomOutLp: WindowManager.LayoutParams? = null
     private var lightToggleLp: WindowManager.LayoutParams? = null
     private var mirrorToggleLp: WindowManager.LayoutParams? = null
     private var clickLp: WindowManager.LayoutParams? = null
@@ -715,6 +720,7 @@ class PointerService : Service() {
     private fun detachTrackpad() {
         val wm = padWm
         if (wm != null) {
+            // COMPONENT_ADD_NOTE: Add safe remove here when detatch
             safeRemoveView(wm, lightOverlayView)
             safeRemoveView(wm, padViewA)
             safeRemoveView(wm, padViewB)
@@ -726,11 +732,14 @@ class PointerService : Service() {
             safeRemoveView(wm, navToggleView)
             safeRemoveView(wm, hideToggleView)
             safeRemoveView(wm, swapView)
+            safeRemoveView(wm, zoomInView)
+            safeRemoveView(wm, zoomOutView)
             safeRemoveView(wm, lightToggleView)
             safeRemoveView(wm, mirrorToggleView)
             safeRemoveView(wm, clickView)
             safeRemoveView(wm, rightClickView)
         }
+        // COMPONENT_ADD_NOTE: Reset component reference here
         lightOverlayView = null
         lightOverlayLp = null
         padViewA = null
@@ -752,6 +761,8 @@ class PointerService : Service() {
         navToggleView = null
         hideToggleView = null
         swapView = null
+        zoomInView = null
+        zoomOutView = null
         lightToggleView = null
         mirrorToggleView = null
         clickView = null
@@ -764,6 +775,8 @@ class PointerService : Service() {
         navToggleLp = null
         hideToggleLp = null
         swapLp = null
+        zoomInLp = null
+        zoomOutLp = null
         lightToggleLp = null
         mirrorToggleLp = null
         clickLp = null
@@ -1076,6 +1089,7 @@ class PointerService : Service() {
             navButtonsEnabled = true
             uiPrefs.edit { putBoolean("nav_buttons_enabled", true) }
         }
+        // COMPONENT_ADD_NOTE: Check component enable here
         showNavButtons = navButtonsEnabled
         val wantBack = uiPrefs.getBoolean("show_back_btn", true) && navButtonsEnabled
         val wantHome = uiPrefs.getBoolean("show_home_btn", true) && navButtonsEnabled
@@ -1084,6 +1098,8 @@ class PointerService : Service() {
         val wantDrag = uiPrefs.getBoolean("show_drag_btn", true)
         val wantHide = uiPrefs.getBoolean("show_hide_btn", true)
         val wantSwap = uiPrefs.getBoolean("show_swap_btn", true)
+        val wantZoomIn = uiPrefs.getBoolean("show_zoom_in_btn", true)
+        val wantZoomOut = uiPrefs.getBoolean("show_zoom_out_btn", true)
         val wantNavToggle = navToggleVisible
         val wantLight = uiPrefs.getBoolean("show_light_btn", true)
         val wantMirror = uiPrefs.getBoolean("show_mirror_btn", true)
@@ -1105,6 +1121,8 @@ class PointerService : Service() {
         Log.d("PointerService", "buttonOpacity $buttonOpacity")
 
         updateCursorAppearance()
+
+        // COMPONENT_ADD_NOTE: Add an update state call here for each new component
 
         dragModeEnabled = uiPrefs.getBoolean("drag_mode_enabled", false)
         dragEnabled = dragModeEnabled
@@ -1228,6 +1246,38 @@ class PointerService : Service() {
             R.drawable.ic_swap,
             Color.argb(buttonOpacity * 255 / 100, 60, 60, 60),
             {},
+            wm,
+            ctx,
+            metrics
+        )
+        updateFloatingButtonState(
+            wantZoomIn,
+            zoomInView,
+            zoomInLp,
+            "nav_zoom_in",
+            R.drawable.ic_zoom_in,
+            Color.argb(buttonOpacity * 255 / 100, 60, 60, 60),
+            {
+                val s = PointerBus.get()
+                PointerAccessibilityService.instance
+                    ?.zoomInAt(s.x, s.y, s.displayW, s.displayH)
+            },
+            wm,
+            ctx,
+            metrics
+        )
+        updateFloatingButtonState(
+            wantZoomOut,
+            zoomOutView,
+            zoomOutLp,
+            "nav_zoom_out",
+            R.drawable.ic_zoom_out,
+            Color.argb(buttonOpacity * 255 / 100, 60, 60, 60),
+            {
+                val s = PointerBus.get()
+                PointerAccessibilityService.instance
+                    ?.zoomOutAt(s.x, s.y, s.displayW, s.displayH)
+            },
             wm,
             ctx,
             metrics
@@ -1413,6 +1463,7 @@ class PointerService : Service() {
 
     // applyOverlayPositions.
     private fun applyOverlayPositions() {
+        // COMPONENT_ADD_NOTE: Add update position call here for each new component
         val wm = padWm ?: return
         updateOverlayPosition("pad_a", padViewA, padLpA, wm)
         updateOverlayPosition("pad_b", padViewB, padLpB, wm)
@@ -1424,6 +1475,8 @@ class PointerService : Service() {
         updateOverlayPosition("nav_toggle", navToggleView, navToggleLp, wm)
         updateOverlayPosition("nav_hide", hideToggleView, hideToggleLp, wm)
         updateOverlayPosition("nav_swap", swapView, swapLp, wm)
+        updateOverlayPosition("nav_zoom_in", zoomInView, zoomInLp, wm)
+        updateOverlayPosition("nav_zoom_out", zoomOutView, zoomOutLp, wm)
         updateOverlayPosition("nav_light", lightToggleView, lightToggleLp, wm)
         updateOverlayPosition("nav_mirror", mirrorToggleView, mirrorToggleLp, wm)
         updateOverlayPosition("nav_click", clickView, clickLp, wm)
@@ -1439,9 +1492,9 @@ class PointerService : Service() {
     ) {
         if (view == null || lp == null) return
         val (rawX, rawY) = loadPosition(key, lp.x, lp.y)
-        val (maxX, maxY) = getDragBounds(view, lp)
-        val newX = rawX.coerceIn(0, maxX.coerceAtLeast(0))
-        val newY = rawY.coerceIn(0, maxY.coerceAtLeast(0))
+        val bounds = getDragBounds(view, lp)
+        val newX = rawX.coerceIn(bounds.minX, bounds.maxX)
+        val newY = rawY.coerceIn(bounds.minY, bounds.maxY)
         if (newX != lp.x || newY != lp.y) {
             lp.x = newX
             lp.y = newY
@@ -1534,6 +1587,7 @@ class PointerService : Service() {
         val baseX = dp(metrics, 16)
         val baseY = dp(metrics, 16)
             val indexOffset = when (key) {
+                // COMPONENT_ADD_NOTE: Add blank index order for new component here
                 "nav_back" -> 0
                 "nav_home" -> 1
                 "nav_recents" -> 2
@@ -1542,10 +1596,12 @@ class PointerService : Service() {
                 "nav_toggle" -> 5
                 "nav_hide" -> 6
                 "nav_swap" -> 7
-                "nav_mirror" -> 8
-                "nav_click" -> 9
-                "nav_right_click" -> 10
-                 "nav_light" -> 11
+                "nav_zoom_in" -> 8
+                "nav_zoom_out" -> 9
+                "nav_mirror" -> 10
+                "nav_click" -> 11
+                "nav_right_click" -> 12
+                "nav_light" -> 13
                 else -> 0
             }
             val lp = createButtonLayoutParams(
@@ -1572,6 +1628,7 @@ class PointerService : Service() {
             safeAddView(wm, view, lp)
 
             when (key) {
+                // COMPONENT_ADD_NOTE: Add mapping for new component here
                 "nav_back" -> { backView = view; backLp = lp }
                 "nav_home" -> { homeView = view; homeLp = lp }
                 "nav_recents" -> { recentsView = view; recentsLp = lp }
@@ -1580,6 +1637,8 @@ class PointerService : Service() {
                 "nav_toggle" -> { navToggleView = view; navToggleLp = lp }
                 "nav_hide" -> { hideToggleView = view; hideToggleLp = lp }
                 "nav_swap" -> { swapView = view; swapLp = lp }
+                "nav_zoom_in" -> { zoomInView = view; zoomInLp = lp }
+                "nav_zoom_out" -> { zoomOutView = view; zoomOutLp = lp }
                 "nav_light" -> { lightToggleView = view; lightToggleLp = lp }
                 "nav_mirror" -> { mirrorToggleView = view; mirrorToggleLp = lp }
                 "nav_click" -> { clickView = view; clickLp = lp }
@@ -1595,6 +1654,8 @@ class PointerService : Service() {
                 "nav_toggle" -> { removeFloatingButton(wm, currentView); navToggleView = null; navToggleLp = null }
                 "nav_hide" -> { removeFloatingButton(wm, currentView); hideToggleView = null; hideToggleLp = null }
                 "nav_swap" -> { removeFloatingButton(wm, currentView); swapView = null; swapLp = null }
+                "nav_zoom_in" -> { removeFloatingButton(wm, currentView); zoomInView = null; zoomInLp = null }
+                "nav_zoom_out" -> { removeFloatingButton(wm, currentView); zoomOutView = null; zoomOutLp = null }
                 "nav_light" -> { removeFloatingButton(wm, currentView); lightToggleView = null; lightToggleLp = null }
                 "nav_mirror" -> { removeFloatingButton(wm, currentView); mirrorToggleView = null; mirrorToggleLp = null }
                 "nav_click" -> { removeFloatingButton(wm, currentView); clickView = null; clickLp = null }
@@ -1695,10 +1756,13 @@ class PointerService : Service() {
                     }
 
                     if (moved) {
-                        val (maxX, maxY) = getDragBounds(v, lp)
-                        Log.d("PointerService","floating button bound: $maxX $maxY")
-                        val newX = (lp.x + dx).toInt().coerceIn(0, maxX.coerceAtLeast(0))
-                        val newY = (lp.y + dy).toInt().coerceIn(0, maxY.coerceAtLeast(0))
+                        val bounds = getDragBounds(v, lp)
+                        Log.d(
+                            "PointerService",
+                            "floating button bound: x(${bounds.minX}..${bounds.maxX}) y(${bounds.minY}..${bounds.maxY})"
+                        )
+                        val newX = (lp.x + dx).toInt().coerceIn(bounds.minX, bounds.maxX)
+                        val newY = (lp.y + dy).toInt().coerceIn(bounds.minY, bounds.maxY)
                         lp.x = newX
                         lp.y = newY
                         update(lp)
@@ -1858,11 +1922,11 @@ class PointerService : Service() {
                     }
 
                     if (moved) {
-                        val (maxX, maxY) = getDragBounds(v, lp)
+                        val bounds = getDragBounds(v, lp)
                         val rawX = (lp.x + dx).toInt()
                         val rawY = (lp.y + dy).toInt()
-                        lp.x = rawX.coerceIn(0, maxX.coerceAtLeast(0))
-                        lp.y = rawY.coerceIn(0, maxY.coerceAtLeast(0))
+                        lp.x = rawX.coerceIn(bounds.minX, bounds.maxX)
+                        lp.y = rawY.coerceIn(bounds.minY, bounds.maxY)
                         update(lp)
                     }
                     return true
@@ -1912,6 +1976,7 @@ class PointerService : Service() {
         metrics: DisplayMetrics
     ) {
         val sizePx = getButtonSizePx(metrics)
+        // COMPONENT_ADD_NOTE: Add button size update call here for new component
         updateButtonSizeFor(wm, backView, backLp, sizePx)
         updateButtonSizeFor(wm, homeView, homeLp, sizePx)
         updateButtonSizeFor(wm, recentsView, recentsLp, sizePx)
@@ -1920,6 +1985,8 @@ class PointerService : Service() {
         updateButtonSizeFor(wm, navToggleView, navToggleLp, sizePx)
         updateButtonSizeFor(wm, hideToggleView, hideToggleLp, sizePx)
         updateButtonSizeFor(wm, swapView, swapLp, sizePx)
+        updateButtonSizeFor(wm, zoomInView, zoomInLp, sizePx)
+        updateButtonSizeFor(wm, zoomOutView, zoomOutLp, sizePx)
         updateButtonSizeFor(wm, lightToggleView, lightToggleLp, sizePx)
         updateButtonSizeFor(wm, mirrorToggleView, mirrorToggleLp, sizePx)
         updateButtonSizeFor(wm, clickView, clickLp, sizePx)
@@ -2190,6 +2257,7 @@ class PointerService : Service() {
     // updateClickThrough.
     private fun updateClickThrough() {
         val wm = padWm ?: return
+        // COMPONENT_ADD_NOTE: Adding update click through here for each component
         updateClickThroughFor(wm, padViewA, padLpA, clickThroughEnabled)
         updateClickThroughFor(wm, padViewB, padLpB, clickThroughEnabled)
         updateClickThroughFor(wm, backView, backLp, clickThroughEnabled)
@@ -2199,6 +2267,8 @@ class PointerService : Service() {
         updateClickThroughFor(wm, dragToggleView, dragToggleLp, clickThroughEnabled)
         updateClickThroughFor(wm, navToggleView, navToggleLp, clickThroughEnabled)
         updateClickThroughFor(wm, swapView, swapLp, clickThroughEnabled)
+        updateClickThroughFor(wm, zoomInView, zoomInLp, clickThroughEnabled)
+        updateClickThroughFor(wm, zoomOutView, zoomOutLp, clickThroughEnabled)
         updateClickThroughFor(wm, lightToggleView, lightToggleLp, clickThroughEnabled)
         updateClickThroughFor(wm, mirrorToggleView, mirrorToggleLp, clickThroughEnabled)
         updateClickThroughFor(wm, clickView, clickLp, clickThroughEnabled)
@@ -2230,6 +2300,7 @@ class PointerService : Service() {
     // bringFloatingButtonsToFront.
     private fun bringFloatingButtonsToFront() {
         val wm = padWm ?: return
+        // COMPONENT_ADD_NOTE: Add a call here for each component
         readdFloatingButton(wm, backView, backLp)
         readdFloatingButton(wm, homeView, homeLp)
         readdFloatingButton(wm, recentsView, recentsLp)
@@ -2238,6 +2309,8 @@ class PointerService : Service() {
         readdFloatingButton(wm, navToggleView, navToggleLp)
         readdFloatingButton(wm, hideToggleView, hideToggleLp)
         readdFloatingButton(wm, swapView, swapLp)
+        readdFloatingButton(wm, zoomInView, zoomInLp)
+        readdFloatingButton(wm, zoomOutView, zoomOutLp)
         readdFloatingButton(wm, lightToggleView, lightToggleLp)
         readdFloatingButton(wm, mirrorToggleView, mirrorToggleLp)
         readdFloatingButton(wm, clickView, clickLp)
@@ -2374,9 +2447,9 @@ class PointerService : Service() {
                     }
 
                     if (moved) {
-                        val (maxX, maxY) = getDragBounds(v, lp)
-                        val newX = (lp.x + dx).toInt().coerceIn(0, maxX.coerceAtLeast(0))
-                        val newY = (lp.y + dy).toInt().coerceIn(0, maxY.coerceAtLeast(0))
+                        val bounds = getDragBounds(v, lp)
+                        val newX = (lp.x + dx).toInt().coerceIn(bounds.minX, bounds.maxX)
+                        val newY = (lp.y + dy).toInt().coerceIn(bounds.minY, bounds.maxY)
                         lp.x = newX
                         lp.y = newY
                         update(lp)
@@ -2450,8 +2523,15 @@ class PointerService : Service() {
         }
     }
 
+    private data class DragBounds(
+        val minX: Int,
+        val maxX: Int,
+        val minY: Int,
+        val maxY: Int
+    )
+
     // getDragBounds.
-    private fun getDragBounds(v: View, lp: WindowManager.LayoutParams): Pair<Int, Int> {
+    private fun getDragBounds(v: View, lp: WindowManager.LayoutParams): DragBounds {
         val display = v.display
         val metrics = DisplayMetrics()
         if (display != null) {
@@ -2460,11 +2540,38 @@ class PointerService : Service() {
         } else {
             metrics.setTo(v.resources.displayMetrics)
         }
-        val width = metrics.widthPixels
-        val height = metrics.heightPixels
-        val maxX = width - lp.width
-        val maxY = height - lp.height
-        return maxX to maxY
+        val displayW = metrics.widthPixels
+        val displayH = metrics.heightPixels
+
+        var minX = 0
+        var minY = 0
+        var rightInset = 0
+        var bottomInset = 0
+
+        val insets = v.rootWindowInsets
+        if (insets != null) {
+            try {
+                val barsAndCutout = insets.getInsets(
+                    WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
+                )
+                minX = maxOf(minX, barsAndCutout.left)
+                minY = maxOf(minY, barsAndCutout.top)
+                rightInset = maxOf(rightInset, barsAndCutout.right)
+                bottomInset = maxOf(bottomInset, barsAndCutout.bottom)
+            } catch (_: Throwable) {
+            }
+            val cutout = insets.displayCutout
+            if (cutout != null) {
+                minX = maxOf(minX, cutout.safeInsetLeft)
+                minY = maxOf(minY, cutout.safeInsetTop)
+                rightInset = maxOf(rightInset, cutout.safeInsetRight)
+                bottomInset = maxOf(bottomInset, cutout.safeInsetBottom)
+            }
+        }
+
+        val maxX = (displayW - lp.width - rightInset).coerceAtLeast(minX)
+        val maxY = (displayH - lp.height - bottomInset).coerceAtLeast(minY)
+        return DragBounds(minX = minX, maxX = maxX, minY = minY, maxY = maxY)
     }
 
     // getDisplaySize.
