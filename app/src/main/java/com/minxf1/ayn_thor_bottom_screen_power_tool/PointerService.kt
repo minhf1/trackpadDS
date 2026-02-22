@@ -2152,7 +2152,7 @@ class PointerService : Service() {
             val bg = pad.background as? GradientDrawable ?: continue
             bg.alpha = (padAlpha * 255).toInt().coerceIn(0, 255)
             pad.alpha = padAlpha
-            val allowTrackpadInput = !hide && !dragModeEnabled
+            val allowTrackpadInput = (!hide && !dragModeEnabled) || lightOverlayEnabled
             (pad as? TrackpadView)?.setTouchInputEnabled(allowTrackpadInput)
             pad.visibility = if (allowTrackpadInput) View.VISIBLE else View.GONE
         }
