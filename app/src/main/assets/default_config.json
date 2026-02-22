@@ -82,7 +82,11 @@
     "nav_light_x": 1139,
     "nav_light_y": 112,
     "light_primary_x": 1819,
-    "light_primary_y": 979
+    "light_primary_y": 979,
+    "nav_zoom_out_x": 1139,
+    "nav_zoom_out_y": 516,
+    "nav_zoom_in_x": 0,
+    "nav_zoom_in_y": 516
   },
   "mirror_positions": {
     "mirror_drag_x": 1139,

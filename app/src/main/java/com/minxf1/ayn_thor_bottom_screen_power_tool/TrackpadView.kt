@@ -33,6 +33,17 @@ class TrackpadView(ctx: Context) : View(ctx) {
     private var hasScrollReturn = false
     private var touchInputEnabled = true
 
+    private fun readFloatPreferenceCompat(key: String, defaultValue: Float): Float {
+        return when (val raw = uiPrefs.all[key]) {
+            is Float -> raw
+            is Int -> raw.toFloat()
+            is Long -> raw.toFloat()
+            is Double -> raw.toFloat()
+            is String -> raw.toFloatOrNull() ?: defaultValue
+            else -> defaultValue
+        }
+    }
+
     fun setTouchInputEnabled(enabled: Boolean) {
         if (touchInputEnabled == enabled) return
         touchInputEnabled = enabled
@@ -155,7 +166,7 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     primaryLastX = e.getX(0)
                     primaryLastY = e.getY(0)
                 }
-                val cursorSensitivity = uiPrefs.getFloat("cursor_sensitivity", 4.5f)
+                val cursorSensitivity = readFloatPreferenceCompat("cursor_sensitivity", 4.5f)
                     .coerceIn(0.5f, 6f)
                 var dxRawTotal = 0f
                 var dyRawTotal = 0f

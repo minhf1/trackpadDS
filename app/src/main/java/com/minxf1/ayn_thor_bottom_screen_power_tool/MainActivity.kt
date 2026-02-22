@@ -1178,11 +1178,13 @@ class MainActivity : ComponentActivity() {
         val uiPrefs = getSharedPreferences("ui_config", MODE_PRIVATE)
         val posPrefs = getSharedPreferences("floating_positions", MODE_PRIVATE)
         val mirrorPrefs = getSharedPreferences("mirror_positions", MODE_PRIVATE)
+        val legacySizePrefs = getSharedPreferences("floating_sizes", MODE_PRIVATE)
         val root = JSONObject().apply {
             put("version", UiConstants.Backup.VERSION)
             put("ui_config", prefsToJson(uiPrefs))
             put("floating_positions", prefsToJson(posPrefs))
             put("mirror_positions", prefsToJson(mirrorPrefs))
+            put("floating_sizes", prefsToJson(legacySizePrefs))
         }
         try {
             contentResolver.openOutputStream(uri)?.use { stream ->
@@ -1204,6 +1206,7 @@ class MainActivity : ComponentActivity() {
             val uiPrefs = getSharedPreferences("ui_config", MODE_PRIVATE)
             val posPrefs = getSharedPreferences("floating_positions", MODE_PRIVATE)
             val mirrorPrefs = getSharedPreferences("mirror_positions", MODE_PRIVATE)
+            val legacySizePrefs = getSharedPreferences("floating_sizes", MODE_PRIVATE)
             if (root.has("ui_config")) {
                 applyJsonToPrefs(root.getJSONObject("ui_config"), uiPrefs)
             }
@@ -1212,6 +1215,9 @@ class MainActivity : ComponentActivity() {
             }
             if (root.has("mirror_positions")) {
                 applyJsonToPrefs(root.getJSONObject("mirror_positions"), mirrorPrefs)
+            }
+            if (root.has("floating_sizes")) {
+                applyJsonToPrefs(root.getJSONObject("floating_sizes"), legacySizePrefs)
             }
             Toast.makeText(this, "Settings imported", Toast.LENGTH_SHORT).show()
             updateOverlayButtonState()
@@ -1247,20 +1253,55 @@ class MainActivity : ComponentActivity() {
             val key = keys.next()
             when (val value = obj.get(key)) {
                 is Boolean -> editor.putBoolean(key, value)
-                is Int -> editor.putInt(key, value)
-                is Long -> editor.putLong(key, value)
-                is Double -> {
-                    val asInt = value.toInt()
-                    if (value == asInt.toDouble()) {
-                        editor.putInt(key, asInt)
-                    } else {
+                is Int -> {
+                    if (isFloatPreferenceKey(key)) {
                         editor.putFloat(key, value.toFloat())
+                    } else {
+                        editor.putInt(key, value)
+                    }
+                }
+                is Long -> {
+                    if (isFloatPreferenceKey(key)) {
+                        editor.putFloat(key, value.toFloat())
+                    } else {
+                        editor.putLong(key, value)
+                    }
+                }
+                is Double -> {
+                    if (isFloatPreferenceKey(key)) {
+                        editor.putFloat(key, value.toFloat())
+                    } else {
+                        val asInt = value.toInt()
+                        if (value == asInt.toDouble()) {
+                            editor.putInt(key, asInt)
+                        } else {
+                            editor.putFloat(key, value.toFloat())
+                        }
                     }
                 }
                 is String -> editor.putString(key, value)
             }
         }
         editor.apply()
+    }
+
+    private fun isFloatPreferenceKey(key: String): Boolean {
+        return key == "cursor_sensitivity" || key == "scroll_sensitivity"
+    }
+
+    private fun readFloatPreferenceCompat(
+        prefs: SharedPreferences,
+        key: String,
+        defaultValue: Float
+    ): Float {
+        return when (val raw = prefs.all[key]) {
+            is Float -> raw
+            is Int -> raw.toFloat()
+            is Long -> raw.toFloat()
+            is Double -> raw.toFloat()
+            is String -> raw.toFloatOrNull() ?: defaultValue
+            else -> defaultValue
+        }
     }
 
     // buildOptionsContainer.
@@ -1500,7 +1541,11 @@ class MainActivity : ComponentActivity() {
         val steps = UiConstants.Sliders.STEPS
         val slider = SeekBar(this).apply {
             max = steps
-            val stored = prefs.getFloat(key, defaultValue).coerceIn(minValue, maxValue)
+            val stored = readFloatPreferenceCompat(prefs, key, defaultValue)
+                .coerceIn(minValue, maxValue)
+            if (prefs.all[key] !is Float) {
+                prefs.edit().putFloat(key, stored).apply()
+            }
             val progressValue = ((stored - minValue) / (maxValue - minValue) * steps).roundToInt()
             progress = progressValue
             value.text = String.format("%.1f", stored)
