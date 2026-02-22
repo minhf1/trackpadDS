@@ -31,6 +31,15 @@ class TrackpadView(ctx: Context) : View(ctx) {
     private var scrollReturnX = 0f
     private var scrollReturnY = 0f
     private var hasScrollReturn = false
+    private var touchInputEnabled = true
+
+    fun setTouchInputEnabled(enabled: Boolean) {
+        if (touchInputEnabled == enabled) return
+        touchInputEnabled = enabled
+        if (!enabled) {
+            resetState()
+        }
+    }
 
     private fun endSecondaryGesture(commitUp: Boolean) {
         if (isSecondaryHoldActive) {
@@ -92,6 +101,7 @@ class TrackpadView(ctx: Context) : View(ctx) {
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
+        if (!touchInputEnabled) return false
         activePointerCount = when (e.actionMasked) {
             MotionEvent.ACTION_POINTER_UP -> (e.pointerCount - 1).coerceAtLeast(0)
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> 0

@@ -2015,13 +2015,16 @@ class PointerService : Service() {
             card.visibility = View.VISIBLE
         }
 
+        val handleVisible = dragModeEnabled
+
         for (pad in trackpadSurfaces) {
             val bg = pad.background as? GradientDrawable ?: continue
             bg.alpha = (padAlpha * 255).toInt().coerceIn(0, 255)
             pad.alpha = padAlpha
+            (pad as? TrackpadView)?.setTouchInputEnabled(!handleVisible)
+            pad.visibility = if (handleVisible) View.GONE else View.VISIBLE
         }
 
-        val handleVisible = dragModeEnabled
         for (handle in trackpadResizeHandles) {
             handle.visibility = if (handleVisible) View.VISIBLE else View.GONE
             handle.alpha = if (handleVisible) 1f else 0f
@@ -2149,7 +2152,9 @@ class PointerService : Service() {
             val bg = pad.background as? GradientDrawable ?: continue
             bg.alpha = (padAlpha * 255).toInt().coerceIn(0, 255)
             pad.alpha = padAlpha
-            pad.visibility = View.VISIBLE
+            val allowTrackpadInput = !hide && !dragModeEnabled
+            (pad as? TrackpadView)?.setTouchInputEnabled(allowTrackpadInput)
+            pad.visibility = if (allowTrackpadInput) View.VISIBLE else View.GONE
         }
 
         val handleVisible = !hide && dragModeEnabled
