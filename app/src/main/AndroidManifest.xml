@@ -36,12 +36,6 @@
             </intent-filter>
         </activity>
         <activity
-            android:name="com.minxf1.ayn_thor_bottom_screen_power_tool.TrackpadActivity"
-            android:exported="false"
-            android:resizeableActivity="true"
-            android:launchMode="singleTask"
-            android:theme="@style/Theme.DualTrackpad.Floating" />
-        <activity
             android:name="com.minxf1.ayn_thor_bottom_screen_power_tool.MirrorActivity"
             android:exported="false"
             android:excludeFromRecents="true"

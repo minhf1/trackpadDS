@@ -31,6 +31,33 @@ class TrackpadView(ctx: Context) : View(ctx) {
     private var scrollReturnX = 0f
     private var scrollReturnY = 0f
     private var hasScrollReturn = false
+    private var touchInputEnabled = true
+
+    fun setTouchInputEnabled(enabled: Boolean) {
+        if (touchInputEnabled == enabled) return
+        touchInputEnabled = enabled
+        if (!enabled) {
+            resetState()
+        }
+    }
+
+    private fun endSecondaryGesture(commitUp: Boolean) {
+        if (isSecondaryHoldActive) {
+            val s = PointerBus.get()
+            if (commitUp) {
+                PointerAccessibilityService.instance?.touchHoldUp(s.x, s.y)
+                if (hasScrollReturn) {
+                    PointerBus.set(scrollReturnX, scrollReturnY)
+                }
+            } else {
+                PointerAccessibilityService.instance?.touchHoldCancel()
+            }
+        }
+        PointerBus.clearGhostCursor()
+        secondaryPointerId = null
+        isSecondaryHoldActive = false
+        hasScrollReturn = false
+    }
 
     private fun isTapClick(
         upTime: Long,
@@ -54,6 +81,8 @@ class TrackpadView(ctx: Context) : View(ctx) {
     }
 
     private fun resetState() {
+        // If a two-finger hold is still active, cancel it before clearing local state.
+        endSecondaryGesture(commitUp = false)
         primaryLastX = 0f
         primaryLastY = 0f
         secondaryLastX = 0f
@@ -62,20 +91,17 @@ class TrackpadView(ctx: Context) : View(ctx) {
         downX = 0f
         downY = 0f
         primaryPointerId = null
-        secondaryPointerId = null
         secondaryDownTime = 0L
         secondaryDownX = 0f
         secondaryDownY = 0f
-        isSecondaryHoldActive = false
         holdX = 0f
         holdY = 0f
         scrollReturnX = 0f
         scrollReturnY = 0f
-        hasScrollReturn = false
-        PointerBus.clearGhostCursor()
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
+        if (!touchInputEnabled) return false
         activePointerCount = when (e.actionMasked) {
             MotionEvent.ACTION_POINTER_UP -> (e.pointerCount - 1).coerceAtLeast(0)
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> 0
@@ -169,13 +195,7 @@ class TrackpadView(ctx: Context) : View(ctx) {
                         secondaryLastY = y
                     } else {
                         // Secondary pointer disappeared without a clean POINTER_UP.
-                        if (isSecondaryHoldActive) {
-                            PointerAccessibilityService.instance?.touchHoldCancel()
-                            PointerBus.clearGhostCursor()
-                            isSecondaryHoldActive = false
-                            hasScrollReturn = false
-                        }
-                        secondaryPointerId = null
+                        endSecondaryGesture(commitUp = false)
                     }
                 }
 
@@ -195,6 +215,9 @@ class TrackpadView(ctx: Context) : View(ctx) {
             }
 
             MotionEvent.ACTION_UP -> {
+                if (isSecondaryHoldActive) {
+                    endSecondaryGesture(commitUp = true)
+                }
                 if (isTapClick(e.eventTime, e.x, e.y, downTime, downX, downY)) {
                     val s = PointerBus.get()
                     if (uiPrefs.getBoolean("haptic_trackpad_press", true)) {
@@ -209,29 +232,23 @@ class TrackpadView(ctx: Context) : View(ctx) {
             MotionEvent.ACTION_POINTER_UP -> {
                 val pointerId = e.getPointerId(e.actionIndex)
                 if (pointerId == secondaryPointerId) {
-                    val s = PointerBus.get()
-                    PointerAccessibilityService.instance?.touchHoldUp(s.x, s.y)
-                    if (hasScrollReturn) {
-                        PointerBus.set(scrollReturnX, scrollReturnY)
-                    }
-                    PointerBus.clearGhostCursor()
-                    secondaryPointerId = null
-                    isSecondaryHoldActive = false
-                    hasScrollReturn = false
+                    endSecondaryGesture(commitUp = true)
                 } else if (pointerId == primaryPointerId) {
-                    primaryPointerId = secondaryPointerId
+                    val fallbackPointerId = secondaryPointerId
+                    if (fallbackPointerId != null) {
+                        endSecondaryGesture(commitUp = true)
+                    }
+                    primaryPointerId = fallbackPointerId
                     if (primaryPointerId != null) {
+                        // Keep delta baseline stable when promoting secondary -> primary.
+                        primaryLastX = secondaryLastX
+                        primaryLastY = secondaryLastY
                         val nextIndex = e.findPointerIndex(primaryPointerId!!)
                         if (nextIndex >= 0) {
                             primaryLastX = e.getX(nextIndex)
                             primaryLastY = e.getY(nextIndex)
                         }
                     }
-                    if (primaryPointerId == secondaryPointerId) {
-                        primaryLastX = secondaryLastX
-                        primaryLastY = secondaryLastY
-                    }
-                    secondaryPointerId = null
                 }
                 return true
             }
