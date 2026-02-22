@@ -1492,9 +1492,9 @@ class PointerService : Service() {
     ) {
         if (view == null || lp == null) return
         val (rawX, rawY) = loadPosition(key, lp.x, lp.y)
-        val (maxX, maxY) = getDragBounds(view, lp)
-        val newX = rawX.coerceIn(0, maxX.coerceAtLeast(0))
-        val newY = rawY.coerceIn(0, maxY.coerceAtLeast(0))
+        val bounds = getDragBounds(view, lp)
+        val newX = rawX.coerceIn(bounds.minX, bounds.maxX)
+        val newY = rawY.coerceIn(bounds.minY, bounds.maxY)
         if (newX != lp.x || newY != lp.y) {
             lp.x = newX
             lp.y = newY
@@ -1756,10 +1756,13 @@ class PointerService : Service() {
                     }
 
                     if (moved) {
-                        val (maxX, maxY) = getDragBounds(v, lp)
-                        Log.d("PointerService","floating button bound: $maxX $maxY")
-                        val newX = (lp.x + dx).toInt().coerceIn(0, maxX.coerceAtLeast(0))
-                        val newY = (lp.y + dy).toInt().coerceIn(0, maxY.coerceAtLeast(0))
+                        val bounds = getDragBounds(v, lp)
+                        Log.d(
+                            "PointerService",
+                            "floating button bound: x(${bounds.minX}..${bounds.maxX}) y(${bounds.minY}..${bounds.maxY})"
+                        )
+                        val newX = (lp.x + dx).toInt().coerceIn(bounds.minX, bounds.maxX)
+                        val newY = (lp.y + dy).toInt().coerceIn(bounds.minY, bounds.maxY)
                         lp.x = newX
                         lp.y = newY
                         update(lp)
@@ -1919,11 +1922,11 @@ class PointerService : Service() {
                     }
 
                     if (moved) {
-                        val (maxX, maxY) = getDragBounds(v, lp)
+                        val bounds = getDragBounds(v, lp)
                         val rawX = (lp.x + dx).toInt()
                         val rawY = (lp.y + dy).toInt()
-                        lp.x = rawX.coerceIn(0, maxX.coerceAtLeast(0))
-                        lp.y = rawY.coerceIn(0, maxY.coerceAtLeast(0))
+                        lp.x = rawX.coerceIn(bounds.minX, bounds.maxX)
+                        lp.y = rawY.coerceIn(bounds.minY, bounds.maxY)
                         update(lp)
                     }
                     return true
@@ -2444,9 +2447,9 @@ class PointerService : Service() {
                     }
 
                     if (moved) {
-                        val (maxX, maxY) = getDragBounds(v, lp)
-                        val newX = (lp.x + dx).toInt().coerceIn(0, maxX.coerceAtLeast(0))
-                        val newY = (lp.y + dy).toInt().coerceIn(0, maxY.coerceAtLeast(0))
+                        val bounds = getDragBounds(v, lp)
+                        val newX = (lp.x + dx).toInt().coerceIn(bounds.minX, bounds.maxX)
+                        val newY = (lp.y + dy).toInt().coerceIn(bounds.minY, bounds.maxY)
                         lp.x = newX
                         lp.y = newY
                         update(lp)
@@ -2520,8 +2523,15 @@ class PointerService : Service() {
         }
     }
 
+    private data class DragBounds(
+        val minX: Int,
+        val maxX: Int,
+        val minY: Int,
+        val maxY: Int
+    )
+
     // getDragBounds.
-    private fun getDragBounds(v: View, lp: WindowManager.LayoutParams): Pair<Int, Int> {
+    private fun getDragBounds(v: View, lp: WindowManager.LayoutParams): DragBounds {
         val display = v.display
         val metrics = DisplayMetrics()
         if (display != null) {
@@ -2530,11 +2540,38 @@ class PointerService : Service() {
         } else {
             metrics.setTo(v.resources.displayMetrics)
         }
-        val width = metrics.widthPixels
-        val height = metrics.heightPixels
-        val maxX = width - lp.width
-        val maxY = height - lp.height
-        return maxX to maxY
+        val displayW = metrics.widthPixels
+        val displayH = metrics.heightPixels
+
+        var minX = 0
+        var minY = 0
+        var rightInset = 0
+        var bottomInset = 0
+
+        val insets = v.rootWindowInsets
+        if (insets != null) {
+            try {
+                val barsAndCutout = insets.getInsets(
+                    WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
+                )
+                minX = maxOf(minX, barsAndCutout.left)
+                minY = maxOf(minY, barsAndCutout.top)
+                rightInset = maxOf(rightInset, barsAndCutout.right)
+                bottomInset = maxOf(bottomInset, barsAndCutout.bottom)
+            } catch (_: Throwable) {
+            }
+            val cutout = insets.displayCutout
+            if (cutout != null) {
+                minX = maxOf(minX, cutout.safeInsetLeft)
+                minY = maxOf(minY, cutout.safeInsetTop)
+                rightInset = maxOf(rightInset, cutout.safeInsetRight)
+                bottomInset = maxOf(bottomInset, cutout.safeInsetBottom)
+            }
+        }
+
+        val maxX = (displayW - lp.width - rightInset).coerceAtLeast(minX)
+        val maxY = (displayH - lp.height - bottomInset).coerceAtLeast(minY)
+        return DragBounds(minX = minX, maxX = maxX, minY = minY, maxY = maxY)
     }
 
     // getDisplaySize.
