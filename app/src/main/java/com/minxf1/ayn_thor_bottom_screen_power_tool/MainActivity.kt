@@ -249,22 +249,34 @@ class MainActivity : ComponentActivity() {
     // ensureDefaultsFromAsset.
     private fun ensureDefaultsFromAsset() {
         val uiPrefs = getSharedPreferences("ui_config", MODE_PRIVATE)
-        if (uiPrefs.getBoolean("defaults_loaded", false)) return
-        if (uiPrefs.all.isNotEmpty()) {
-            uiPrefs.edit { putBoolean("defaults_loaded", true) }
-            return
-        }
         try {
             val json = assets.open("default_config.json").bufferedReader().use { it.readText() }
             val root = JSONObject(json)
-            root.optJSONObject("ui_config")?.let { applyJsonToPrefs(it, uiPrefs) }
+            val assetVersion = root.optInt("version", 1)
+            val appliedVersion = uiPrefs.getInt("defaults_version_applied", 0)
+            if (appliedVersion >= assetVersion) return
+
+            root.optJSONObject("ui_config")?.let {
+                applyJsonToPrefs(it, uiPrefs, onlyIfMissing = true)
+            }
             root.optJSONObject("floating_positions")?.let {
-                applyJsonToPrefs(it, getSharedPreferences("floating_positions", MODE_PRIVATE))
+                applyJsonToPrefs(
+                    it,
+                    getSharedPreferences("floating_positions", MODE_PRIVATE),
+                    onlyIfMissing = true
+                )
             }
             root.optJSONObject("mirror_positions")?.let {
-                applyJsonToPrefs(it, getSharedPreferences("mirror_positions", MODE_PRIVATE))
+                applyJsonToPrefs(
+                    it,
+                    getSharedPreferences("mirror_positions", MODE_PRIVATE),
+                    onlyIfMissing = true
+                )
             }
-            uiPrefs.edit().putBoolean("defaults_loaded", true).apply()
+            uiPrefs.edit()
+                .putBoolean("defaults_loaded", true)
+                .putInt("defaults_version_applied", assetVersion)
+                .apply()
         } catch (_: Throwable) {
         }
     }
@@ -1245,12 +1257,15 @@ class MainActivity : ComponentActivity() {
     // applyJsonToPrefs.
     private fun applyJsonToPrefs(
         obj: JSONObject,
-        prefs: SharedPreferences
+        prefs: SharedPreferences,
+        onlyIfMissing: Boolean = false
     ) {
         val editor = prefs.edit()
+        var hasChanges = false
         val keys = obj.keys()
         while (keys.hasNext()) {
             val key = keys.next()
+            if (onlyIfMissing && prefs.contains(key)) continue
             when (val value = obj.get(key)) {
                 is Boolean -> editor.putBoolean(key, value)
                 is Int -> {
@@ -1281,8 +1296,11 @@ class MainActivity : ComponentActivity() {
                 }
                 is String -> editor.putString(key, value)
             }
+            hasChanges = true
         }
-        editor.apply()
+        if (hasChanges) {
+            editor.apply()
+        }
     }
 
     private fun isFloatPreferenceKey(key: String): Boolean {
