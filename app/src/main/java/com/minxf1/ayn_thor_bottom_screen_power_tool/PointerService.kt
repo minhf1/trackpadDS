@@ -85,6 +85,7 @@ class PointerService : Service() {
     private var mirrorToggleView: ImageButton? = null
     private var clickView: ImageButton? = null
     private var rightClickView: ImageButton? = null
+    private var alwaysSwipeToggleView: ImageButton? = null
     private var backLp: WindowManager.LayoutParams? = null
     private var homeLp: WindowManager.LayoutParams? = null
     private var recentsLp: WindowManager.LayoutParams? = null
@@ -99,10 +100,12 @@ class PointerService : Service() {
     private var mirrorToggleLp: WindowManager.LayoutParams? = null
     private var clickLp: WindowManager.LayoutParams? = null
     private var rightClickLp: WindowManager.LayoutParams? = null
+    private var alwaysSwipeToggleLp: WindowManager.LayoutParams? = null
     private var dragModeEnabled = false
     private var showNavButtons = true
     private var hideOverlays = false
     private var clickThroughEnabled = false
+    private var alwaysSwipeEnabled = false
     private var lightOverlayEnabled = false
     private var lightOffKeepControls = false
     private var lightOffPrimaryButton = false
@@ -738,6 +741,7 @@ class PointerService : Service() {
             safeRemoveView(wm, mirrorToggleView)
             safeRemoveView(wm, clickView)
             safeRemoveView(wm, rightClickView)
+            safeRemoveView(wm, alwaysSwipeToggleView)
         }
         // COMPONENT_ADD_NOTE: Reset component reference here
         lightOverlayView = null
@@ -767,6 +771,7 @@ class PointerService : Service() {
         mirrorToggleView = null
         clickView = null
         rightClickView = null
+        alwaysSwipeToggleView = null
         backLp = null
         homeLp = null
         recentsLp = null
@@ -781,6 +786,7 @@ class PointerService : Service() {
         mirrorToggleLp = null
         clickLp = null
         rightClickLp = null
+        alwaysSwipeToggleLp = null
     }
 
     // createFloatingButton.
@@ -1074,6 +1080,35 @@ class PointerService : Service() {
             )
             safeAddView(wm, swapView, swapLp)
         }
+
+        alwaysSwipeEnabled = uiPrefs.getBoolean("always_swipe_enabled", false)
+        if (uiPrefs.getBoolean("show_always_swipe_btn", true)) {
+            alwaysSwipeToggleLp = createButtonLayoutParams(
+                "nav_always_swipe",
+                sizePx,
+                baseX + 8 * (sizePx + gapPx),
+                baseY
+            )
+            alwaysSwipeToggleView =
+                createFloatingButton(ctx, R.drawable.ic_scroll_sensitivity, sizePx, defaultColor) {
+                    alwaysSwipeEnabled = !alwaysSwipeEnabled
+                    uiPrefs.edit { putBoolean("always_swipe_enabled", alwaysSwipeEnabled) }
+                    updateAlwaysSwipeToggleAppearance()
+                }
+            alwaysSwipeToggleView?.setOnTouchListener(
+                FloatingButtonDragTouchListener(
+                    "nav_always_swipe",
+                    { alwaysSwipeToggleLp },
+                    { lp ->
+                        alwaysSwipeToggleLp = lp
+                        wm.updateViewLayout(alwaysSwipeToggleView, lp)
+                    },
+                    allowTapWhenDragEnabled = false
+                )
+            )
+            updateAlwaysSwipeToggleAppearance()
+            safeAddView(wm, alwaysSwipeToggleView, alwaysSwipeToggleLp)
+        }
     }
 
     // applyUiConfig.
@@ -1105,6 +1140,8 @@ class PointerService : Service() {
         val wantMirror = uiPrefs.getBoolean("show_mirror_btn", true)
         val wantClick = uiPrefs.getBoolean("show_click_btn", true)
         val wantRightClick = uiPrefs.getBoolean("show_right_click_btn", true)
+        val wantAlwaysSwipe = uiPrefs.getBoolean("show_always_swipe_btn", true)
+        alwaysSwipeEnabled = uiPrefs.getBoolean("always_swipe_enabled", false)
         val showPadLeft = uiPrefs.getBoolean("show_trackpad_left", true)
         val showPadRight = uiPrefs.getBoolean("show_trackpad_right", true)
         buttonOpacity = uiPrefs.getInt("button_opacity", 100).coerceIn(0, 100)
@@ -1356,9 +1393,27 @@ class PointerService : Service() {
             metrics,
             allowTapWhenDragEnabled = false
         )
+        updateFloatingButtonState(
+            wantAlwaysSwipe,
+            alwaysSwipeToggleView,
+            alwaysSwipeToggleLp,
+            "nav_always_swipe",
+            R.drawable.ic_scroll_sensitivity,
+            Color.argb(buttonOpacity * 255 / 100, 60, 60, 60),
+            {
+                alwaysSwipeEnabled = !alwaysSwipeEnabled
+                uiPrefs.edit { putBoolean("always_swipe_enabled", alwaysSwipeEnabled) }
+                updateAlwaysSwipeToggleAppearance()
+            },
+            wm,
+            ctx,
+            metrics,
+            allowTapWhenDragEnabled = false
+        )
 
         bringFloatingButtonsToFront()
         updateDragToggleAppearance()
+        updateAlwaysSwipeToggleAppearance()
         updateDragModeVisuals()
         updateHideOverlaysVisuals()
         updateClickThrough()
@@ -1481,6 +1536,7 @@ class PointerService : Service() {
         updateOverlayPosition("nav_mirror", mirrorToggleView, mirrorToggleLp, wm)
         updateOverlayPosition("nav_click", clickView, clickLp, wm)
         updateOverlayPosition("nav_right_click", rightClickView, rightClickLp, wm)
+        updateOverlayPosition("nav_always_swipe", alwaysSwipeToggleView, alwaysSwipeToggleLp, wm)
     }
 
     // updateOverlayPosition.
@@ -1602,6 +1658,7 @@ class PointerService : Service() {
                 "nav_click" -> 11
                 "nav_right_click" -> 12
                 "nav_light" -> 13
+                "nav_always_swipe" -> 14
                 else -> 0
             }
             val lp = createButtonLayoutParams(
@@ -1643,6 +1700,7 @@ class PointerService : Service() {
                 "nav_mirror" -> { mirrorToggleView = view; mirrorToggleLp = lp }
                 "nav_click" -> { clickView = view; clickLp = lp }
                 "nav_right_click" -> { rightClickView = view; rightClickLp = lp }
+                "nav_always_swipe" -> { alwaysSwipeToggleView = view; alwaysSwipeToggleLp = lp }
             }
         } else {
             when (key) {
@@ -1660,6 +1718,11 @@ class PointerService : Service() {
                 "nav_mirror" -> { removeFloatingButton(wm, currentView); mirrorToggleView = null; mirrorToggleLp = null }
                 "nav_click" -> { removeFloatingButton(wm, currentView); clickView = null; clickLp = null }
                 "nav_right_click" -> { removeFloatingButton(wm, currentView); rightClickView = null; rightClickLp = null }
+                "nav_always_swipe" -> {
+                    removeFloatingButton(wm, currentView)
+                    alwaysSwipeToggleView = null
+                    alwaysSwipeToggleLp = null
+                }
             }
         }
     }
@@ -1991,6 +2054,7 @@ class PointerService : Service() {
         updateButtonSizeFor(wm, mirrorToggleView, mirrorToggleLp, sizePx)
         updateButtonSizeFor(wm, clickView, clickLp, sizePx)
         updateButtonSizeFor(wm, rightClickView, rightClickLp, sizePx)
+        updateButtonSizeFor(wm, alwaysSwipeToggleView, alwaysSwipeToggleLp, sizePx)
     }
 
     // updateButtonSizeFor.
@@ -2037,6 +2101,17 @@ class PointerService : Service() {
         val button = dragToggleView ?: return
         val bg = button.background as? GradientDrawable ?: return
         if (dragModeEnabled) {
+            bg.setColor(Color.argb(160, 120, 190, 255))
+        } else {
+            bg.setColor(Color.argb(110, 60, 60, 60))
+        }
+    }
+
+    // updateAlwaysSwipeToggleAppearance.
+    private fun updateAlwaysSwipeToggleAppearance() {
+        val button = alwaysSwipeToggleView ?: return
+        val bg = button.background as? GradientDrawable ?: return
+        if (alwaysSwipeEnabled) {
             bg.setColor(Color.argb(160, 120, 190, 255))
         } else {
             bg.setColor(Color.argb(110, 60, 60, 60))
@@ -2273,6 +2348,7 @@ class PointerService : Service() {
         updateClickThroughFor(wm, mirrorToggleView, mirrorToggleLp, clickThroughEnabled)
         updateClickThroughFor(wm, clickView, clickLp, clickThroughEnabled)
         updateClickThroughFor(wm, rightClickView, rightClickLp, clickThroughEnabled)
+        updateClickThroughFor(wm, alwaysSwipeToggleView, alwaysSwipeToggleLp, clickThroughEnabled)
         // Keep hideToggleView clickable so it can be turned back on.
     }
 
@@ -2315,6 +2391,7 @@ class PointerService : Service() {
         readdFloatingButton(wm, mirrorToggleView, mirrorToggleLp)
         readdFloatingButton(wm, clickView, clickLp)
         readdFloatingButton(wm, rightClickView, rightClickLp)
+        readdFloatingButton(wm, alwaysSwipeToggleView, alwaysSwipeToggleLp)
     }
 
     // readdFloatingButton.
