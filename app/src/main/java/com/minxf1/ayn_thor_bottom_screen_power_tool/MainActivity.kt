@@ -9,6 +9,7 @@ import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.hardware.display.DisplayManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Display
@@ -68,6 +69,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ensureDefaultsFromAsset()
+        title = "${getString(R.string.app_name)} v${getAppVersionName()}"
 
         // Root container and global padding/theme colors.
         val root = LinearLayout(this).apply {
@@ -132,6 +134,19 @@ class MainActivity : ComponentActivity() {
         updateOverlayButtonState()
         if (pendingStart) {
             proceedStartFlow()
+        }
+    }
+
+    private fun getAppVersionName(): String {
+        return try {
+            val info =
+                packageManager.getPackageInfo(
+                    packageName,
+                    PackageManager.PackageInfoFlags.of(0)
+                )
+            info.versionName ?: "?"
+        } catch (_: Throwable) {
+            "?"
         }
     }
 
