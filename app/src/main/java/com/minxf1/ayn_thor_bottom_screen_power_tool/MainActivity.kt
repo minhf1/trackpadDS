@@ -343,6 +343,7 @@ class MainActivity : ComponentActivity() {
             ToggleSpec("show_mirror_btn", "Mirror mode toggle button", R.drawable.ic_mirror),
             ToggleSpec("show_click_btn", "Click button", R.drawable.ic_trackpad_click),
             ToggleSpec("show_right_click_btn", "Right-click button", R.drawable.ic_trackpad_right_click),
+            ToggleSpec("show_always_swipe_btn", "Toggle always swipe button", R.drawable.ic_scroll_sensitivity),
             ToggleSpec("show_trackpad_left", "Left trackpad", R.drawable.trackpad_right, flipIcon = true),
             ToggleSpec("show_trackpad_right", "Right trackpad", R.drawable.trackpad_right)
         ), prefs)
@@ -668,6 +669,12 @@ class MainActivity : ComponentActivity() {
             label = "Trackpad click muti-touch support",
             key = "trackpad_click_multitouch",
             icon = R.drawable.ic_trackpad_click,
+            prefs = prefs
+        ))
+        trackpadModeOptions.addView(buildToggleRow(
+            label = "Always swipe mode - allow swiping with 1 finger on trackpad good for some case where in-game pointer only regconize swipe like Wii emu",
+            key = "always_swipe_enabled",
+            icon = R.drawable.ic_scroll_sensitivity,
             prefs = prefs
         ))
 

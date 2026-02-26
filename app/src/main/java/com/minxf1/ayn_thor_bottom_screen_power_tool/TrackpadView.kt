@@ -31,6 +31,7 @@ class TrackpadView(ctx: Context) : View(ctx) {
     private var scrollReturnX = 0f
     private var scrollReturnY = 0f
     private var hasScrollReturn = false
+    private var isPrimaryHoldActive = false
     private var touchInputEnabled = true
 
     private fun readFloatPreferenceCompat(key: String, defaultValue: Float): Float {
@@ -94,6 +95,10 @@ class TrackpadView(ctx: Context) : View(ctx) {
     private fun resetState() {
         // If a two-finger hold is still active, cancel it before clearing local state.
         endSecondaryGesture(commitUp = false)
+        if (isPrimaryHoldActive) {
+            PointerAccessibilityService.instance?.touchHoldCancel()
+            isPrimaryHoldActive = false
+        }
         primaryLastX = 0f
         primaryLastY = 0f
         secondaryLastX = 0f
@@ -113,6 +118,7 @@ class TrackpadView(ctx: Context) : View(ctx) {
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         if (!touchInputEnabled) return false
+        val alwaysSwipeEnabled = uiPrefs.getBoolean("always_swipe_enabled", false)
         activePointerCount = when (e.actionMasked) {
             MotionEvent.ACTION_POINTER_UP -> (e.pointerCount - 1).coerceAtLeast(0)
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> 0
@@ -134,6 +140,11 @@ class TrackpadView(ctx: Context) : View(ctx) {
                 downY = e.y
                 primaryPointerId = e.getPointerId(0)
                 secondaryPointerId = null
+                if (alwaysSwipeEnabled) {
+                    val s = PointerBus.get()
+                    PointerAccessibilityService.instance?.touchHoldDown(s.x, s.y)
+                    isPrimaryHoldActive = true
+                }
                 return true
             }
 
@@ -146,15 +157,17 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     secondaryDownY = e.getY(e.actionIndex)
                     secondaryLastX = secondaryDownX
                     secondaryLastY = secondaryDownY
-                    val s = PointerBus.get()
-                    holdX = s.x
-                    holdY = s.y
-                    scrollReturnX = s.x
-                    scrollReturnY = s.y
-                    hasScrollReturn = true
-                    PointerBus.setGhostCursor(scrollReturnX, scrollReturnY)
-                    PointerAccessibilityService.instance?.touchHoldDown(s.x, s.y)
-                    isSecondaryHoldActive = true
+                    if (!alwaysSwipeEnabled) {
+                        val s = PointerBus.get()
+                        holdX = s.x
+                        holdY = s.y
+                        scrollReturnX = s.x
+                        scrollReturnY = s.y
+                        hasScrollReturn = true
+                        PointerBus.setGhostCursor(scrollReturnX, scrollReturnY)
+                        PointerAccessibilityService.instance?.touchHoldDown(s.x, s.y)
+                        isSecondaryHoldActive = true
+                    }
                 }
                 return true
             }
@@ -216,7 +229,10 @@ class TrackpadView(ctx: Context) : View(ctx) {
 
                 val (dx, dy) = RotationUtil.mapDeltaForRotation(4, dxRawTotal, dyRawTotal)
                 PointerBus.moveBy(dx, dy)
-                if (secondaryId != null) {
+                if (isPrimaryHoldActive) {
+                    val s = PointerBus.get()
+                    PointerAccessibilityService.instance?.touchHoldMove(s.x, s.y)
+                } else if (secondaryId != null) {
                     holdX += dx
                     holdY += dy
                     val s = PointerBus.get()
@@ -226,10 +242,15 @@ class TrackpadView(ctx: Context) : View(ctx) {
             }
 
             MotionEvent.ACTION_UP -> {
+                val primaryHoldWasActive = isPrimaryHoldActive
                 if (isSecondaryHoldActive) {
                     endSecondaryGesture(commitUp = true)
                 }
-                if (isTapClick(e.eventTime, e.x, e.y, downTime, downX, downY)) {
+                if (primaryHoldWasActive) {
+                    val s = PointerBus.get()
+                    PointerAccessibilityService.instance?.touchHoldUp(s.x, s.y)
+                    isPrimaryHoldActive = false
+                } else if (isTapClick(e.eventTime, e.x, e.y, downTime, downX, downY)) {
                     val s = PointerBus.get()
                     if (uiPrefs.getBoolean("haptic_trackpad_press", true)) {
                         performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
