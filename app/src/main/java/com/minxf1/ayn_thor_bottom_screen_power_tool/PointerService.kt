@@ -2317,6 +2317,7 @@ class PointerService : Service() {
 
         dragToggleView?.visibility = if (hide) View.GONE else View.VISIBLE
         navToggleView?.visibility = if (hide) View.GONE else View.VISIBLE
+        closeView?.visibility = if (hide) View.GONE else View.VISIBLE
         dragToggleView?.isEnabled = !hide
         navToggleView?.isEnabled = !hide
         closeView?.isEnabled = !hide
