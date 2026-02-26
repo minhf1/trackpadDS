@@ -671,6 +671,12 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.ic_trackpad_click,
             prefs = prefs
         ))
+        trackpadModeOptions.addView(buildToggleRow(
+            label = "Always swipe mode - allow swiping with 1 finger on trackpad good for some case where in-game pointer only regconize swipe like Wii emu",
+            key = "always_swipe_enabled",
+            icon = R.drawable.ic_scroll_sensitivity,
+            prefs = prefs
+        ))
 
         val trackpadClickHeader = buildSubgroupHeaderRow(
             title = "Trackpad click sensitivity",
