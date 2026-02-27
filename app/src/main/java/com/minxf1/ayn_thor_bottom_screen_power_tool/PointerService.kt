@@ -106,6 +106,7 @@ class PointerService : Service() {
     private var hideOverlays = false
     private var clickThroughEnabled = false
     private var alwaysSwipeEnabled = false
+    private var alwaysSwipeHidePrimaryCursor = false
     private var lightOverlayEnabled = false
     private var lightOffKeepControls = false
     private var lightOffPrimaryButton = false
@@ -299,7 +300,15 @@ class PointerService : Service() {
                     val scrollRecent = now - indicator.atMs <=
                         PointerConstants.Timing.SCROLL_INDICATOR_WINDOW_MS
                     val moved = (lp.x != lastCursorX || lp.y != lastCursorY)
-                    if (moved) {
+                    val forceHideCursor = shouldHideCursorForAlwaysSwipe()
+                    if (forceHideCursor) {
+                        lastCursorX = lp.x
+                        lastCursorY = lp.y
+                        lastCursorMoveMs = now
+                        cursorView?.animate()?.cancel()
+                        cursorView?.alpha = 0f
+                        cursorFadedOut = true
+                    } else if (moved) {
                         lastCursorX = lp.x
                         lastCursorY = lp.y
                         lastCursorMoveMs = now
@@ -330,7 +339,7 @@ class PointerService : Service() {
                             cursorFadedOut = true
                         }
                     }
-                    val showIndicator = scrollRecent
+                    val showIndicator = scrollRecent && !forceHideCursor
                     (cursorView as? CursorDotView)?.setScrollIndicator(
                         if (showIndicator) indicator.dirX else 0,
                         if (showIndicator) indicator.dirY else 0
@@ -1142,6 +1151,7 @@ class PointerService : Service() {
         val wantRightClick = uiPrefs.getBoolean("show_right_click_btn", true)
         val wantAlwaysSwipe = uiPrefs.getBoolean("show_always_swipe_btn", true)
         alwaysSwipeEnabled = uiPrefs.getBoolean("always_swipe_enabled", false)
+        alwaysSwipeHidePrimaryCursor = uiPrefs.getBoolean("always_swipe_hide_primary_cursor", true)
         val showPadLeft = uiPrefs.getBoolean("show_trackpad_left", true)
         val showPadRight = uiPrefs.getBoolean("show_trackpad_right", true)
         buttonOpacity = uiPrefs.getInt("button_opacity", 100).coerceIn(0, 100)
@@ -1451,13 +1461,19 @@ class PointerService : Service() {
         cursorBaseAlpha = PointerConstants.Alpha.CURSOR * (opacityPct / 100f)
         (cursorView as? CursorDotView)?.setColors(baseColor, indicatorColor)
         (cursorView as? CursorDotView)?.setEdge(edgePx, edgeColor)
-        cursorView?.alpha = cursorBaseAlpha
+        val targetAlpha = if (shouldHideCursorForAlwaysSwipe()) 0f else cursorBaseAlpha
+        cursorView?.alpha = targetAlpha
+        cursorFadedOut = targetAlpha <= 0f
         val ghostBase = toGray(baseColor)
         val ghostIndicator = scaleColor(ghostBase, 0.85f)
         val ghostEdge = toGray(edgeColor)
         (ghostCursorView as? CursorDotView)?.setColors(ghostBase, ghostIndicator)
         (ghostCursorView as? CursorDotView)?.setEdge(edgePx, ghostEdge)
         ghostCursorView?.alpha = cursorBaseAlpha
+    }
+
+    private fun shouldHideCursorForAlwaysSwipe(): Boolean {
+        return alwaysSwipeEnabled && alwaysSwipeHidePrimaryCursor
     }
 
     private fun readCursorColor(): Int {

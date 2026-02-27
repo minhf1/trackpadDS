@@ -71,6 +71,15 @@ class TrackpadView(ctx: Context) : View(ctx) {
         hasScrollReturn = false
     }
 
+    private fun recenterCursorAfterAlwaysSwipeGestureIfNeeded(alwaysSwipeEnabled: Boolean) {
+        if (!alwaysSwipeEnabled) return
+        if (!uiPrefs.getBoolean("always_swipe_return_center_on_finish", true)) return
+        val s = PointerBus.get()
+        val centerX = ((s.displayW - 1).coerceAtLeast(0) / 2f)
+        val centerY = ((s.displayH - 1).coerceAtLeast(0) / 2f)
+        PointerBus.set(centerX, centerY)
+    }
+
     private fun isTapClick(
         upTime: Long,
         upX: Float,
@@ -97,6 +106,9 @@ class TrackpadView(ctx: Context) : View(ctx) {
         endSecondaryGesture(commitUp = false)
         if (isPrimaryHoldActive) {
             PointerAccessibilityService.instance?.touchHoldCancel()
+            recenterCursorAfterAlwaysSwipeGestureIfNeeded(
+                alwaysSwipeEnabled = uiPrefs.getBoolean("always_swipe_enabled", false)
+            )
             isPrimaryHoldActive = false
         }
         primaryLastX = 0f
@@ -250,6 +262,7 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     val s = PointerBus.get()
                     PointerAccessibilityService.instance?.touchHoldUp(s.x, s.y)
                     isPrimaryHoldActive = false
+                    recenterCursorAfterAlwaysSwipeGestureIfNeeded(alwaysSwipeEnabled)
                 } else if (isTapClick(e.eventTime, e.x, e.y, downTime, downX, downY)) {
                     val s = PointerBus.get()
                     if (uiPrefs.getBoolean("haptic_trackpad_press", true)) {

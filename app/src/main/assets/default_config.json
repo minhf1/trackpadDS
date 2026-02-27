@@ -27,6 +27,8 @@
     "show_right_click_btn": true,
     "show_always_swipe_btn": true,
     "always_swipe_enabled": false,
+    "always_swipe_hide_primary_cursor": true,
+    "always_swipe_return_center_on_finish": true,
     "click_hold_right_click": true,
     "trackpad_left_width": 461,
     "mirror_show_back": false,

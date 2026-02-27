@@ -692,6 +692,18 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.ic_scroll_sensitivity,
             prefs = prefs
         ))
+        trackpadModeOptions.addView(buildToggleRow(
+            label = "Hide cursor on primary screen while always swipe mode is enabled",
+            key = "always_swipe_hide_primary_cursor",
+            icon = R.drawable.ic_scroll_sensitivity,
+            prefs = prefs
+        ))
+        trackpadModeOptions.addView(buildToggleRow(
+            label = "Return cursor to screen center when always swipe gesture ends",
+            key = "always_swipe_return_center_on_finish",
+            icon = R.drawable.ic_scroll_sensitivity,
+            prefs = prefs
+        ))
 
         val trackpadClickHeader = buildSubgroupHeaderRow(
             title = "Trackpad click sensitivity",
