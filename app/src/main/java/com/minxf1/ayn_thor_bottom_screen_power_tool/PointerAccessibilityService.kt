@@ -37,20 +37,31 @@ class PointerAccessibilityService : AccessibilityService() {
     private var holdPendingX = 0f
     private var holdPendingY = 0f
     private var holdHasPending = false
+    private var holdRebaseInProgress = false
 
     private val lastTopByDisplay = mutableMapOf<Int, ComponentName>()
     private var gestureSeq = 0
 
-    private fun dispatchGestureLogged(tag: String, gesture: GestureDescription) {
+    private fun dispatchGestureLogged(
+        tag: String,
+        gesture: GestureDescription,
+        onCompleted: (() -> Unit)? = null,
+        onCancelled: (() -> Unit)? = null
+    ) {
         val seq = ++gestureSeq
         val ok = dispatchGesture(
             gesture,
             object : GestureResultCallback() {
+                override fun onCompleted(gestureDescription: GestureDescription?) {
+                    onCompleted?.invoke()
+                }
+
                 override fun onCancelled(gestureDescription: GestureDescription?) {
                     Log.w("PointerAS", "gesture cancelled tag=$tag seq=$seq")
                     if (tag.startsWith("hold")) {
                         onHoldGestureCancelled()
                     }
+                    onCancelled?.invoke()
                 }
             },
             null
@@ -60,6 +71,7 @@ class PointerAccessibilityService : AccessibilityService() {
             if (tag.startsWith("hold")) {
                 onHoldGestureCancelled()
             }
+            onCancelled?.invoke()
         }
     }
 
@@ -172,9 +184,10 @@ class PointerAccessibilityService : AccessibilityService() {
     fun touchHoldDown(x: Float, y: Float) {
         val (cx, cy) = clampToDisplay(x, y)
         val now = SystemClock.uptimeMillis()
+        val (nx, ny) = clampToDisplay(cx + 0.1f, cy + 0.1f)
         val path = Path().apply {
             moveTo(cx, cy)
-            lineTo(cx + 0.1f, cy + 0.1f)
+            lineTo(nx, ny)
         }
         // Fix this function - bounding box not correct
         val stroke = GestureDescription.StrokeDescription(
@@ -189,6 +202,7 @@ class PointerAccessibilityService : AccessibilityService() {
         holdLastEventMs = now
         holdStartMs = now
         holdHasPending = false
+        holdRebaseInProgress = false
         dispatchGestureLogged("holdDown", GestureDescription.Builder().addStroke(stroke).build())
     }
 
@@ -198,6 +212,7 @@ class PointerAccessibilityService : AccessibilityService() {
             touchHoldDown(cx, cy)
             return
         }
+        if (holdRebaseInProgress) return
         val now = SystemClock.uptimeMillis()
         if (now - holdStartMs < holdStartDelayMs) {
             holdPendingX = cx
@@ -232,6 +247,7 @@ class PointerAccessibilityService : AccessibilityService() {
     fun touchHoldUp(x: Float, y: Float) {
         val (cx, cy) = clampToDisplay(x, y)
         val current = holdStroke ?: return
+        if (holdRebaseInProgress) return
         val now = SystemClock.uptimeMillis()
         val endX = if (holdHasPending) holdPendingX else cx
         val endY = if (holdHasPending) holdPendingY else cy
@@ -248,7 +264,42 @@ class PointerAccessibilityService : AccessibilityService() {
         holdLastEventMs = 0L
         holdStartMs = 0L
         holdHasPending = false
+        holdRebaseInProgress = false
         dispatchGestureLogged("holdUp", GestureDescription.Builder().addStroke(next).build())
+    }
+
+    fun touchHoldRebase(x: Float, y: Float) {
+        val (targetX, targetY) = clampToDisplay(x, y)
+        val current = holdStroke ?: run {
+            touchHoldDown(targetX, targetY)
+            return
+        }
+        if (holdRebaseInProgress) return
+        holdRebaseInProgress = true
+        val now = SystemClock.uptimeMillis()
+        val duration = (now - holdLastEventMs)
+            .coerceAtLeast(holdMinSegmentMs)
+            .coerceAtMost(holdMaxSegmentMs)
+        val (nx, ny) = clampToDisplay(holdLastX + 0.1f, holdLastY + 0.1f)
+        val path = Path().apply {
+            moveTo(holdLastX, holdLastY)
+            lineTo(nx, ny)
+        }
+        val endStroke = current.continueStroke(path, 0, duration, false)
+        holdStroke = null
+        holdLastEventMs = 0L
+        holdStartMs = 0L
+        holdHasPending = false
+        dispatchGestureLogged(
+            "holdRebaseUp",
+            GestureDescription.Builder().addStroke(endStroke).build(),
+            onCompleted = {
+                touchHoldDown(targetX, targetY)
+            },
+            onCancelled = {
+                holdRebaseInProgress = false
+            }
+        )
     }
 
     fun touchHoldCancel() {
@@ -256,6 +307,7 @@ class PointerAccessibilityService : AccessibilityService() {
         holdLastEventMs = 0L
         holdStartMs = 0L
         holdHasPending = false
+        holdRebaseInProgress = false
     }
 
     fun focusPrimaryBySwipe(displayW: Int, displayH: Int) {

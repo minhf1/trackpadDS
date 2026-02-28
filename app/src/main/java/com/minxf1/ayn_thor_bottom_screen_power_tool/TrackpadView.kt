@@ -4,6 +4,7 @@ import android.content.Context
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import android.os.SystemClock
 import com.minxf1.ayn_thor_bottom_screen_power_tool.UiConstants.Sliders.SCROLL_SENSITIVITY_DEFAULT
 import com.minxf1.ayn_thor_bottom_screen_power_tool.UiConstants.Sliders.SCROLL_SENSITIVITY_MAX
 import com.minxf1.ayn_thor_bottom_screen_power_tool.UiConstants.Sliders.SCROLL_SENSITIVITY_MIN
@@ -33,6 +34,10 @@ class TrackpadView(ctx: Context) : View(ctx) {
     private var hasScrollReturn = false
     private var isPrimaryHoldActive = false
     private var touchInputEnabled = true
+    private var primarySwipeInjectX = 0f
+    private var primarySwipeInjectY = 0f
+    private var primarySwipeInjectInitialized = false
+    private var lastAlwaysSwipeRebaseMs = 0L
 
     private fun readFloatPreferenceCompat(key: String, defaultValue: Float): Float {
         return when (val raw = uiPrefs.all[key]) {
@@ -126,6 +131,59 @@ class TrackpadView(ctx: Context) : View(ctx) {
         holdY = 0f
         scrollReturnX = 0f
         scrollReturnY = 0f
+        primarySwipeInjectInitialized = false
+        primarySwipeInjectX = 0f
+        primarySwipeInjectY = 0f
+        lastAlwaysSwipeRebaseMs = 0L
+    }
+
+    private fun clampToDisplayBounds(x: Float, y: Float): Pair<Float, Float> {
+        val s = PointerBus.get()
+        val maxX = (s.displayW - 1).coerceAtLeast(0).toFloat()
+        val maxY = (s.displayH - 1).coerceAtLeast(0).toFloat()
+        return Pair(x.coerceIn(0f, maxX), y.coerceIn(0f, maxY))
+    }
+
+    private fun ensurePrimarySwipeInjectorInitialized() {
+        if (primarySwipeInjectInitialized) return
+        val s = PointerBus.get()
+        val (cx, cy) = clampToDisplayBounds(s.x, s.y)
+        primarySwipeInjectX = cx
+        primarySwipeInjectY = cy
+        primarySwipeInjectInitialized = true
+    }
+
+    private fun shouldRebaseAlwaysSwipeInjector(dx: Float, dy: Float): Boolean {
+        val s = PointerBus.get()
+        val w = s.displayW
+        val h = s.displayH
+        if (w <= 0 || h <= 0) return false
+        val edgeMarginX = (w * 0.08f).coerceAtLeast(64f)
+        val edgeMarginY = (h * 0.08f).coerceAtLeast(64f)
+        val maxX = (w - 1).coerceAtLeast(0).toFloat()
+        val maxY = (h - 1).coerceAtLeast(0).toFloat()
+        val nearLeft = primarySwipeInjectX <= edgeMarginX
+        val nearRight = primarySwipeInjectX >= (maxX - edgeMarginX)
+        val nearTop = primarySwipeInjectY <= edgeMarginY
+        val nearBottom = primarySwipeInjectY >= (maxY - edgeMarginY)
+        val pushingOutward =
+            (nearLeft && dx < 0f) ||
+                (nearRight && dx > 0f) ||
+                (nearTop && dy < 0f) ||
+                (nearBottom && dy > 0f)
+        if (!pushingOutward) return false
+        val now = SystemClock.uptimeMillis()
+        return now - lastAlwaysSwipeRebaseMs >= 90L
+    }
+
+    private fun rebaseAlwaysSwipeInjectorToCenter() {
+        val s = PointerBus.get()
+        val centerX = ((s.displayW - 1).coerceAtLeast(0) / 2f)
+        val centerY = ((s.displayH - 1).coerceAtLeast(0) / 2f)
+        primarySwipeInjectX = centerX
+        primarySwipeInjectY = centerY
+        lastAlwaysSwipeRebaseMs = SystemClock.uptimeMillis()
+        PointerAccessibilityService.instance?.touchHoldRebase(centerX, centerY)
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
@@ -154,6 +212,11 @@ class TrackpadView(ctx: Context) : View(ctx) {
                 secondaryPointerId = null
                 if (alwaysSwipeEnabled) {
                     val s = PointerBus.get()
+                    val (ix, iy) = clampToDisplayBounds(s.x, s.y)
+                    primarySwipeInjectX = ix
+                    primarySwipeInjectY = iy
+                    primarySwipeInjectInitialized = true
+                    lastAlwaysSwipeRebaseMs = 0L
                     PointerAccessibilityService.instance?.touchHoldDown(s.x, s.y)
                     isPrimaryHoldActive = true
                 }
@@ -242,8 +305,18 @@ class TrackpadView(ctx: Context) : View(ctx) {
                 val (dx, dy) = RotationUtil.mapDeltaForRotation(4, dxRawTotal, dyRawTotal)
                 PointerBus.moveBy(dx, dy)
                 if (isPrimaryHoldActive) {
-                    val s = PointerBus.get()
-                    PointerAccessibilityService.instance?.touchHoldMove(s.x, s.y)
+                    ensurePrimarySwipeInjectorInitialized()
+                    val (nextX, nextY) = clampToDisplayBounds(
+                        primarySwipeInjectX + dx,
+                        primarySwipeInjectY + dy
+                    )
+                    primarySwipeInjectX = nextX
+                    primarySwipeInjectY = nextY
+                    PointerAccessibilityService.instance
+                        ?.touchHoldMove(primarySwipeInjectX, primarySwipeInjectY)
+                    if (shouldRebaseAlwaysSwipeInjector(dx, dy)) {
+                        rebaseAlwaysSwipeInjectorToCenter()
+                    }
                 } else if (secondaryId != null) {
                     holdX += dx
                     holdY += dy
@@ -259,8 +332,8 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     endSecondaryGesture(commitUp = true)
                 }
                 if (primaryHoldWasActive) {
-                    val s = PointerBus.get()
-                    PointerAccessibilityService.instance?.touchHoldUp(s.x, s.y)
+                    PointerAccessibilityService.instance
+                        ?.touchHoldUp(primarySwipeInjectX, primarySwipeInjectY)
                     isPrimaryHoldActive = false
                     recenterCursorAfterAlwaysSwipeGestureIfNeeded(alwaysSwipeEnabled)
                 } else if (isTapClick(e.eventTime, e.x, e.y, downTime, downX, downY)) {
