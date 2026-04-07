@@ -358,6 +358,7 @@ class MainActivity : ComponentActivity() {
             ToggleSpec("show_mirror_btn", "Mirror mode toggle button", R.drawable.ic_mirror),
             ToggleSpec("show_click_btn", "Click button", R.drawable.ic_trackpad_click),
             ToggleSpec("show_right_click_btn", "Right-click button", R.drawable.ic_trackpad_right_click),
+            ToggleSpec("show_auto_click_btn", "Auto-click toggle button", R.drawable.macro_icon_btn),
             ToggleSpec("show_always_swipe_btn", "Toggle always swipe button", R.drawable.ic_scroll_sensitivity),
             ToggleSpec("show_trackpad_left", "Left trackpad", R.drawable.trackpad_right, flipIcon = true),
             ToggleSpec("show_trackpad_right", "Right trackpad", R.drawable.trackpad_right)
@@ -715,10 +716,19 @@ class MainActivity : ComponentActivity() {
             label = "Tap distance (px)",
             key = "trackpad_click_distance_px",
             prefs = prefs,
-            icon = R.drawable.ic_trackpad_click,
+            icon = R.drawable.macro_icon_btn,
             minValue = UiConstants.Sliders.TRACKPAD_CLICK_DISTANCE_MIN_PX,
             maxValue = UiConstants.Sliders.TRACKPAD_CLICK_DISTANCE_MAX_PX,
             defaultValue = UiConstants.Sliders.TRACKPAD_CLICK_DISTANCE_DEFAULT_PX
+        ))
+        trackpadClickOptions.addView(buildIntSliderRow(
+            label = "Auto-click interval (ms)",
+            key = "auto_click_interval_ms",
+            prefs = prefs,
+            icon = R.drawable.ic_trackpad_click,
+            minValue = UiConstants.Sliders.AUTO_CLICK_INTERVAL_MIN_MS,
+            maxValue = UiConstants.Sliders.AUTO_CLICK_INTERVAL_MAX_MS,
+            defaultValue = UiConstants.Sliders.AUTO_CLICK_INTERVAL_DEFAULT_MS
         ))
 
         val lightOffHeader = buildSubgroupHeaderRow(
