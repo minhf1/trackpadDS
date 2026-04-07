@@ -1053,6 +1053,9 @@ class PointerService : Service() {
             hideToggleView = createFloatingButton(ctx, R.drawable.ic_eye_open, sizePx, defaultColor) {
                 if (!dragModeEnabled) {
                     toggleHideOverlays()
+                    if (uiPrefs.getBoolean("hide_floating_disable_component", false)) {
+                        toggleClickThrough()
+                    }
                 }
             }
             hideToggleView?.setOnLongClickListener {
@@ -2336,7 +2339,7 @@ class PointerService : Service() {
     }
 
     // applyHideOverlaysVisuals.
-    private fun applyHideOverlaysVisuals(hide: Boolean, keepVisible: View?) {
+    private fun  applyHideOverlaysVisuals(hide: Boolean, keepVisible: View?) {
         val baseButtonAlpha = (buttonOpacity.coerceIn(0, 100) * 255 / 100)
         val basePadAlpha = (trackpadOpacity.coerceIn(0, 100) / 100f)
         val buttonAlpha = if (hide) 0 else baseButtonAlpha
@@ -2381,7 +2384,7 @@ class PointerService : Service() {
             val bg = pad.background as? GradientDrawable ?: continue
             bg.alpha = (padAlpha * 255).toInt().coerceIn(0, 255)
             pad.alpha = padAlpha
-            val allowTrackpadInput = (!hide && !dragModeEnabled) || lightOverlayEnabled
+            val allowTrackpadInput = (!dragModeEnabled) || lightOverlayEnabled
             (pad as? TrackpadView)?.setTouchInputEnabled(allowTrackpadInput)
             pad.visibility = if (allowTrackpadInput) View.VISIBLE else View.GONE
         }

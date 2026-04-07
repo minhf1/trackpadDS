@@ -1,7 +1,8 @@
 {
-  "version": 1,
+  "version": 2,
   "ui_config": {
     "show_drag_btn": true,
+    "hide_floating_disable_component": false,
     "overlay_running": false,
     "show_trackpad_right": true,
     "button_opacity": 100,
