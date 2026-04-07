@@ -1,8 +1,10 @@
 package com.minxf1.ayn_thor_bottom_screen_power_tool
 
 import android.content.Context
+import android.hardware.display.DisplayManager
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
+import android.view.Surface
 import android.view.View
 import com.minxf1.ayn_thor_bottom_screen_power_tool.UiConstants.Sliders.SCROLL_SENSITIVITY_DEFAULT
 import com.minxf1.ayn_thor_bottom_screen_power_tool.UiConstants.Sliders.SCROLL_SENSITIVITY_MAX
@@ -33,6 +35,18 @@ class TrackpadView(ctx: Context) : View(ctx) {
     private var hasScrollReturn = false
     private var isPrimaryHoldActive = false
     private var touchInputEnabled = true
+
+    private fun getPrimaryDisplayRotation(): Int {
+        val dm = context.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
+        val rotation = dm?.getDisplay(android.view.Display.DEFAULT_DISPLAY)?.rotation
+        return when (rotation) {
+            Surface.ROTATION_0,
+            Surface.ROTATION_90,
+            Surface.ROTATION_180,
+            Surface.ROTATION_270 -> rotation
+            else -> Surface.ROTATION_0
+        }
+    }
 
     private fun readFloatPreferenceCompat(key: String, defaultValue: Float): Float {
         return when (val raw = uiPrefs.all[key]) {
@@ -227,7 +241,12 @@ class TrackpadView(ctx: Context) : View(ctx) {
                     return true
                 }
 
-                val (dx, dy) = RotationUtil.mapDeltaForRotation(4, dxRawTotal, dyRawTotal)
+                val primaryRotation = getPrimaryDisplayRotation()
+                val (dx, dy) = RotationUtil.mapDeltaForRotation(
+                    primaryRotation,
+                    dxRawTotal,
+                    dyRawTotal
+                )
                 PointerBus.moveBy(dx, dy)
                 if (isPrimaryHoldActive) {
                     val s = PointerBus.get()
