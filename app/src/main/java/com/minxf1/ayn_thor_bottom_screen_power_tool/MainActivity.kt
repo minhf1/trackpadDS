@@ -676,6 +676,13 @@ class MainActivity : ComponentActivity() {
         val trackpadModeOptions = buildOptionsContainer(paddingTopDp = UiConstants.Spacing.SUBGROUP_TOP)
         toggleVisibilityOnClick(trackpadModeHeader, trackpadModeOptions)
         trackpadModeOptions.addView(buildToggleRow(
+            label = "Hide floating button also disable component",
+            key = "hide_floating_disable_component",
+            icon = android.R.drawable.ic_menu_close_clear_cancel,
+            prefs = prefs,
+            defaultValue = false
+        ))
+        trackpadModeOptions.addView(buildToggleRow(
             label = "Click button hold for a right-click",
             key = "click_hold_right_click",
             icon = R.drawable.ic_trackpad_right_click,
@@ -1173,7 +1180,8 @@ class MainActivity : ComponentActivity() {
         val key: String,
         val label: String,
         val icon: Int,
-        val flipIcon: Boolean? = null
+        val flipIcon: Boolean? = null,
+        val defaultValue: Boolean = true
     )
 
     private data class ToggleRow(
@@ -1381,7 +1389,16 @@ class MainActivity : ComponentActivity() {
         // Collapsible list of toggle rows bound to preference keys.
         val options = buildOptionsContainer(paddingTopDp)
         for (item in items) {
-            options.addView(buildToggleRow(item.label, item.key, item.icon, prefs, flipIcon = item.flipIcon))
+            options.addView(
+                buildToggleRow(
+                    label = item.label,
+                    key = item.key,
+                    icon = item.icon,
+                    prefs = prefs,
+                    flipIcon = item.flipIcon,
+                    defaultValue = item.defaultValue
+                )
+            )
         }
         toggleVisibilityOnClick(header, options)
         return options
@@ -1394,7 +1411,8 @@ class MainActivity : ComponentActivity() {
         icon: Int,
         prefs: SharedPreferences,
         onCheckedChange: ((Boolean) -> Unit)? = null,
-        flipIcon: Boolean? = null
+        flipIcon: Boolean? = null,
+        defaultValue: Boolean = true
     ): LinearLayout {
         return buildToggleRowWithSwitch(
             label = label,
@@ -1402,7 +1420,8 @@ class MainActivity : ComponentActivity() {
             icon = icon,
             prefs = prefs,
             onCheckedChange = onCheckedChange,
-            flipIcon = flipIcon
+            flipIcon = flipIcon,
+            defaultValue = defaultValue
         ).row
     }
 
@@ -1413,7 +1432,8 @@ class MainActivity : ComponentActivity() {
         icon: Int,
         prefs: SharedPreferences,
         onCheckedChange: ((Boolean) -> Unit)? = null,
-        flipIcon: Boolean? = null
+        flipIcon: Boolean? = null,
+        defaultValue: Boolean = true
     ): ToggleRow {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -1450,7 +1470,7 @@ class MainActivity : ComponentActivity() {
         }
 
         val toggle = Switch(this).apply {
-            isChecked = prefs.getBoolean(key, true)
+            isChecked = prefs.getBoolean(key, defaultValue)
             val enabledColor = ColorStateList.valueOf(UiConstants.Colors.TEXT_SECONDARY)
             val disabledColor = ColorStateList.valueOf(UiConstants.Colors.BLACK)
             thumbTintList = if (isChecked) enabledColor else disabledColor
