@@ -1,5 +1,6 @@
 package com.minxf1.ayn_thor_bottom_screen_power_tool
 
+import android.util.Log
 import android.view.Surface
 
 object RotationUtil {
@@ -12,10 +13,10 @@ object RotationUtil {
      */
     fun mapDeltaForRotation(rotation: Int, dx: Float, dy: Float): Pair<Float, Float> {
         return when (rotation) {
-            Surface.ROTATION_0 -> dx to dy
-            Surface.ROTATION_90 -> dy to -dx
-            Surface.ROTATION_180 -> -dx to -dy
-            Surface.ROTATION_270 -> -dy to dx
+            Surface.ROTATION_0 -> -dy to dx
+            Surface.ROTATION_90 -> dx to dy
+            Surface.ROTATION_180 -> dy to -dx
+            Surface.ROTATION_270 -> -dx to -dy
             else -> dx to dy
         }
     }
