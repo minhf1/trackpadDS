@@ -97,6 +97,10 @@ object UiConstants {
         const val TRACKPAD_CLICK_DISTANCE_MAX_PX = 80
         const val TRACKPAD_CLICK_DISTANCE_DEFAULT_PX = 20
 
+        const val AUTO_CLICK_INTERVAL_MIN_MS = 50
+        const val AUTO_CLICK_INTERVAL_MAX_MS = 1000
+        const val AUTO_CLICK_INTERVAL_DEFAULT_MS = 120
+
         const val CURSOR_OPACITY_MIN = 0
         const val CURSOR_OPACITY_MAX = 100
         const val CURSOR_OPACITY_DEFAULT = 100
