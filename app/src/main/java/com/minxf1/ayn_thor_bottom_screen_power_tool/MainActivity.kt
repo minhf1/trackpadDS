@@ -348,6 +348,7 @@ class MainActivity : ComponentActivity() {
             ToggleSpec("show_back_btn", "Back button", R.drawable.ic_back),
             ToggleSpec("show_home_btn", "Home button", R.drawable.ic_home),
             ToggleSpec("show_recents_btn", "Recents button", R.drawable.ic_menu),
+            ToggleSpec("show_task_view_btn", "Task view button", R.drawable.task_view_icon, defaultValue = false),
             ToggleSpec("show_drag_btn", "Drag toggle button", R.drawable.ic_drag),
             ToggleSpec("show_stop_btn", "Stop overlay button", android.R.drawable.ic_menu_close_clear_cancel),
             ToggleSpec("show_hide_btn", "Show/Hide toggle button", R.drawable.ic_eye_open),

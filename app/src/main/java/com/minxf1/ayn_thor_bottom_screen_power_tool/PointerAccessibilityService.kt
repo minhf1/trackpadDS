@@ -334,6 +334,48 @@ class PointerAccessibilityService : AccessibilityService() {
         dispatchPinchGesture(x, y, displayW, displayH, zoomIn = false)
     }
 
+    fun performTaskViewThreeFingerSwipeUp() {
+        if (holdStroke != null) return
+        val s = PointerBus.get()
+        if (s.displayW <= 0 || s.displayH <= 0) return
+
+        val maxX = (s.displayW - 1).toFloat()
+        val maxY = (s.displayH - 1).toFloat()
+        val centerX = (s.displayW / 2f).coerceIn(0f, maxX)
+        val spacing = (s.displayW * 0.08f).coerceIn(32f, 120f)
+        val startY = (s.displayH * 0.78f).coerceIn(0f, maxY)
+        val endY = (s.displayH * 0.22f).coerceIn(0f, maxY)
+        if (startY <= endY) return
+
+        val x1 = (centerX - spacing).coerceIn(0f, maxX)
+        val x2 = centerX.coerceIn(0f, maxX)
+        val x3 = (centerX + spacing).coerceIn(0f, maxX)
+
+        val path1 = Path().apply {
+            moveTo(x1, startY)
+            lineTo(x1, endY)
+        }
+        val path2 = Path().apply {
+            moveTo(x2, startY)
+            lineTo(x2, endY)
+        }
+        val path3 = Path().apply {
+            moveTo(x3, startY)
+            lineTo(x3, endY)
+        }
+
+        val durationMs = 180L
+        val stroke1 = GestureDescription.StrokeDescription(path1, 0, durationMs)
+        val stroke2 = GestureDescription.StrokeDescription(path2, 0, durationMs)
+        val stroke3 = GestureDescription.StrokeDescription(path3, 0, durationMs)
+        val gesture = GestureDescription.Builder()
+            .addStroke(stroke1)
+            .addStroke(stroke2)
+            .addStroke(stroke3)
+            .build()
+        dispatchGestureLogged("taskViewThreeFingerSwipeUp", gesture)
+    }
+
     private fun dispatchPinchGesture(
         x: Float,
         y: Float,

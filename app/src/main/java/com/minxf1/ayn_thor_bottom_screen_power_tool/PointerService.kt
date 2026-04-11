@@ -74,6 +74,7 @@ class PointerService : Service() {
     private var backView: ImageButton? = null
     private var homeView: ImageButton? = null
     private var recentsView: ImageButton? = null
+    private var taskViewButtonView: ImageButton? = null
     private var closeView: ImageButton? = null
     private var dragToggleView: ImageButton? = null
     private var navToggleView: ImageButton? = null
@@ -90,6 +91,7 @@ class PointerService : Service() {
     private var backLp: WindowManager.LayoutParams? = null
     private var homeLp: WindowManager.LayoutParams? = null
     private var recentsLp: WindowManager.LayoutParams? = null
+    private var taskViewButtonLp: WindowManager.LayoutParams? = null
     private var closeLp: WindowManager.LayoutParams? = null
     private var dragToggleLp: WindowManager.LayoutParams? = null
     private var navToggleLp: WindowManager.LayoutParams? = null
@@ -741,6 +743,7 @@ class PointerService : Service() {
             safeRemoveView(wm, backView)
             safeRemoveView(wm, homeView)
             safeRemoveView(wm, recentsView)
+            safeRemoveView(wm, taskViewButtonView)
             safeRemoveView(wm, closeView)
             safeRemoveView(wm, dragToggleView)
             safeRemoveView(wm, navToggleView)
@@ -773,6 +776,7 @@ class PointerService : Service() {
         backView = null
         homeView = null
         recentsView = null
+        taskViewButtonView = null
         closeView = null
         dragToggleView = null
         navToggleView = null
@@ -789,6 +793,7 @@ class PointerService : Service() {
         backLp = null
         homeLp = null
         recentsLp = null
+        taskViewButtonLp = null
         closeLp = null
         dragToggleLp = null
         navToggleLp = null
@@ -989,7 +994,7 @@ class PointerService : Service() {
         metrics: DisplayMetrics
     ) {
         val wm = padWm ?: return
-        if (dragToggleView != null || backView != null || homeView != null || recentsView != null || closeView != null) {
+        if (dragToggleView != null || backView != null || homeView != null || recentsView != null || taskViewButtonView != null || closeView != null) {
             return
         }
 
@@ -1018,7 +1023,7 @@ class PointerService : Service() {
             dragToggleLp = createButtonLayoutParams(
                 "nav_drag",
                 sizePx,
-                baseX + 4 * (sizePx + gapPx),
+                baseX + 5 * (sizePx + gapPx),
                 baseY
             )
             dragToggleView = createFloatingButton(ctx, R.drawable.ic_drag, sizePx, dragOffColor) {
@@ -1047,7 +1052,7 @@ class PointerService : Service() {
             hideToggleLp = createButtonLayoutParams(
                 "nav_hide",
                 sizePx,
-                baseX + 6 * (sizePx + gapPx),
+                baseX + 7 * (sizePx + gapPx),
                 baseY
             )
             hideToggleView = createFloatingButton(ctx, R.drawable.ic_eye_open, sizePx, defaultColor) {
@@ -1082,7 +1087,7 @@ class PointerService : Service() {
             swapLp = createButtonLayoutParams(
                 "nav_swap",
                 sizePx,
-                baseX + 7 * (sizePx + gapPx),
+                baseX + 8 * (sizePx + gapPx),
                 baseY
             )
             swapView = createFloatingButton(ctx, R.drawable.ic_swap, sizePx, defaultColor) {}
@@ -1104,7 +1109,7 @@ class PointerService : Service() {
             alwaysSwipeToggleLp = createButtonLayoutParams(
                 "nav_always_swipe",
                 sizePx,
-                baseX + 8 * (sizePx + gapPx),
+                baseX + 9 * (sizePx + gapPx),
                 baseY
             )
             alwaysSwipeToggleView =
@@ -1147,6 +1152,7 @@ class PointerService : Service() {
         val wantBack = uiPrefs.getBoolean("show_back_btn", true) && navButtonsEnabled
         val wantHome = uiPrefs.getBoolean("show_home_btn", true) && navButtonsEnabled
         val wantRecents = uiPrefs.getBoolean("show_recents_btn", true) && navButtonsEnabled
+        val wantTaskView = uiPrefs.getBoolean("show_task_view_btn", false) && navButtonsEnabled
         val wantStop = uiPrefs.getBoolean("show_stop_btn", true) && navButtonsEnabled
         val wantDrag = uiPrefs.getBoolean("show_drag_btn", true)
         val wantHide = uiPrefs.getBoolean("show_hide_btn", true)
@@ -1217,6 +1223,18 @@ class PointerService : Service() {
             R.drawable.ic_menu,
             Color.argb(buttonOpacity * 255 / 100, 60, 60, 60),
             { PointerAccessibilityService.instance?.performGlobalAction(GLOBAL_ACTION_RECENTS) },
+            wm,
+            ctx,
+            metrics
+        )
+        updateFloatingButtonState(
+            wantTaskView,
+            taskViewButtonView,
+            taskViewButtonLp,
+            "nav_task_view",
+            R.drawable.task_view_icon,
+            Color.argb(buttonOpacity * 255 / 100, 60, 60, 60),
+            { PointerAccessibilityService.instance?.performTaskViewThreeFingerSwipeUp() },
             wm,
             ctx,
             metrics
@@ -1563,6 +1581,7 @@ class PointerService : Service() {
         updateOverlayPosition("nav_back", backView, backLp, wm)
         updateOverlayPosition("nav_home", homeView, homeLp, wm)
         updateOverlayPosition("nav_recents", recentsView, recentsLp, wm)
+        updateOverlayPosition("nav_task_view", taskViewButtonView, taskViewButtonLp, wm)
         updateOverlayPosition("nav_close", closeView, closeLp, wm)
         updateOverlayPosition("nav_drag", dragToggleView, dragToggleLp, wm)
         updateOverlayPosition("nav_toggle", navToggleView, navToggleLp, wm)
@@ -1686,19 +1705,20 @@ class PointerService : Service() {
                 "nav_back" -> 0
                 "nav_home" -> 1
                 "nav_recents" -> 2
-                "nav_close" -> 3
-                "nav_drag" -> 4
-                "nav_toggle" -> 5
-                "nav_hide" -> 6
-                "nav_swap" -> 7
-                "nav_zoom_in" -> 8
-                "nav_zoom_out" -> 9
-                "nav_mirror" -> 10
-                "nav_click" -> 11
-                "nav_right_click" -> 12
-                "nav_light" -> 13
-                "nav_auto_click" -> 14
-                "nav_always_swipe" -> 15
+                "nav_task_view" -> 3
+                "nav_close" -> 4
+                "nav_drag" -> 5
+                "nav_toggle" -> 6
+                "nav_hide" -> 7
+                "nav_swap" -> 8
+                "nav_zoom_in" -> 9
+                "nav_zoom_out" -> 10
+                "nav_mirror" -> 11
+                "nav_click" -> 12
+                "nav_right_click" -> 13
+                "nav_light" -> 14
+                "nav_auto_click" -> 15
+                "nav_always_swipe" -> 16
                 else -> 0
             }
             val lp = createButtonLayoutParams(
@@ -1729,6 +1749,7 @@ class PointerService : Service() {
                 "nav_back" -> { backView = view; backLp = lp }
                 "nav_home" -> { homeView = view; homeLp = lp }
                 "nav_recents" -> { recentsView = view; recentsLp = lp }
+                "nav_task_view" -> { taskViewButtonView = view; taskViewButtonLp = lp }
                 "nav_close" -> { closeView = view; closeLp = lp }
                 "nav_drag" -> { dragToggleView = view; dragToggleLp = lp }
                 "nav_toggle" -> { navToggleView = view; navToggleLp = lp }
@@ -1748,6 +1769,11 @@ class PointerService : Service() {
                 "nav_back" -> { removeFloatingButton(wm, currentView); backView = null; backLp = null }
                 "nav_home" -> { removeFloatingButton(wm, currentView); homeView = null; homeLp = null }
                 "nav_recents" -> { removeFloatingButton(wm, currentView); recentsView = null; recentsLp = null }
+                "nav_task_view" -> {
+                    removeFloatingButton(wm, currentView)
+                    taskViewButtonView = null
+                    taskViewButtonLp = null
+                }
                 "nav_close" -> { removeFloatingButton(wm, currentView); closeView = null; closeLp = null }
                 "nav_drag" -> { removeFloatingButton(wm, currentView); dragToggleView = null; dragToggleLp = null }
                 "nav_toggle" -> { removeFloatingButton(wm, currentView); navToggleView = null; navToggleLp = null }
@@ -2090,6 +2116,7 @@ class PointerService : Service() {
         updateButtonSizeFor(wm, backView, backLp, sizePx)
         updateButtonSizeFor(wm, homeView, homeLp, sizePx)
         updateButtonSizeFor(wm, recentsView, recentsLp, sizePx)
+        updateButtonSizeFor(wm, taskViewButtonView, taskViewButtonLp, sizePx)
         updateButtonSizeFor(wm, closeView, closeLp, sizePx)
         updateButtonSizeFor(wm, dragToggleView, dragToggleLp, sizePx)
         updateButtonSizeFor(wm, navToggleView, navToggleLp, sizePx)
@@ -2429,6 +2456,7 @@ class PointerService : Service() {
         updateClickThroughFor(wm, backView, backLp, clickThroughEnabled)
         updateClickThroughFor(wm, homeView, homeLp, clickThroughEnabled)
         updateClickThroughFor(wm, recentsView, recentsLp, clickThroughEnabled)
+        updateClickThroughFor(wm, taskViewButtonView, taskViewButtonLp, clickThroughEnabled)
         updateClickThroughFor(wm, closeView, closeLp, clickThroughEnabled)
         updateClickThroughFor(wm, dragToggleView, dragToggleLp, clickThroughEnabled)
         updateClickThroughFor(wm, navToggleView, navToggleLp, clickThroughEnabled)
@@ -2472,6 +2500,7 @@ class PointerService : Service() {
         readdFloatingButton(wm, backView, backLp)
         readdFloatingButton(wm, homeView, homeLp)
         readdFloatingButton(wm, recentsView, recentsLp)
+        readdFloatingButton(wm, taskViewButtonView, taskViewButtonLp)
         readdFloatingButton(wm, closeView, closeLp)
         readdFloatingButton(wm, dragToggleView, dragToggleLp)
         readdFloatingButton(wm, navToggleView, navToggleLp)
@@ -2835,11 +2864,12 @@ class PointerService : Service() {
         defaultColor: Int,
         closeColor: Int
     ) {
-        if (backView != null || homeView != null || recentsView != null || closeView != null) return
+        if (backView != null || homeView != null || recentsView != null || taskViewButtonView != null || closeView != null) return
 
         val showBack = uiPrefs.getBoolean("show_back_btn", true)
         val showHome = uiPrefs.getBoolean("show_home_btn", true)
         val showRecents = uiPrefs.getBoolean("show_recents_btn", true)
+        val showTaskView = uiPrefs.getBoolean("show_task_view_btn", false)
         val showStop = uiPrefs.getBoolean("show_stop_btn", true)
 
         var slot = 0
@@ -2886,6 +2916,21 @@ class PointerService : Service() {
                 })
             )
         safeAddView(wm, recentsView, recentsLp)
+            slot++
+        }
+        if (showTaskView) {
+            taskViewButtonLp = createButtonLayoutParams("nav_task_view", sizePx, baseX + slot * (sizePx + gapPx), baseY)
+            taskViewButtonView = createFloatingButton(ctx, R.drawable.task_view_icon, sizePx, defaultColor) {
+                PointerAccessibilityService.instance
+                    ?.performTaskViewThreeFingerSwipeUp()
+            }
+            taskViewButtonView?.setOnTouchListener(
+                FloatingButtonDragTouchListener("nav_task_view", { taskViewButtonLp }, { lp ->
+                    taskViewButtonLp = lp
+                    wm.updateViewLayout(taskViewButtonView, lp)
+                })
+            )
+            safeAddView(wm, taskViewButtonView, taskViewButtonLp)
             slot++
         }
         if (showStop) {
