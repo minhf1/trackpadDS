@@ -72,7 +72,8 @@ class TrackpadView(ctx: Context) : View(ctx) {
             val s = PointerBus.get()
             if (commitUp) {
                 PointerAccessibilityService.instance?.touchHoldUp(s.x, s.y)
-                if (hasScrollReturn) {
+                val keepDraggedCursorPosition = uiPrefs.getBoolean("no_return_cursor_after_drag", false)
+                if (hasScrollReturn && !keepDraggedCursorPosition) {
                     PointerBus.set(scrollReturnX, scrollReturnY)
                 }
             } else {

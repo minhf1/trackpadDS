@@ -41,6 +41,7 @@
     "show_home_btn": true,
     "mirror_show_home": false,
     "trackpad_click_multitouch": true,
+    "no_return_cursor_after_drag": false,
     "trackpad_click_timeout_ms": 100,
     "trackpad_click_distance_px": 10,
     "cursor_opacity": 100,
