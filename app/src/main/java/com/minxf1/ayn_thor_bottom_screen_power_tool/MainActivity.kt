@@ -701,6 +701,13 @@ class MainActivity : ComponentActivity() {
             icon = R.drawable.ic_scroll_sensitivity,
             prefs = prefs
         ))
+        trackpadModeOptions.addView(buildToggleRow(
+            label = "Not returning cursor after a drag (Good for some scenario when a more desktop style cursor is needed such as PC emu or remote control)",
+            key = "no_return_cursor_after_drag",
+            icon = R.drawable.ic_drag,
+            prefs = prefs,
+            defaultValue = false
+        ))
 
         val trackpadClickHeader = buildSubgroupHeaderRow(
             title = "Trackpad click sensitivity",
